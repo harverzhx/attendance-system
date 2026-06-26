@@ -1,0 +1,195 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adviser Dashboard</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .section-card { border:1px solid var(--border); border-radius:12px; padding:16px; background:#fff; }
+    .section-card h3 { margin:0 0 12px;font-size:16px; }
+    .stats-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .stats-row .stat { text-align:center; padding:8px; border-radius:8px; background:#f8fafc; }
+    .stats-row .stat .val { font-size:20px; font-weight:700; }
+    .stats-row .stat .lbl { font-size:11px; color:var(--gray); }
+    .adv-photo { width:32px; height:32px; border-radius:50%; object-fit:cover; vertical-align:middle; }
+    .adv-photo-pl { width:32px; height:32px; border-radius:50%; background:#e2e8f0; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:#64748b; vertical-align:middle; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div id="section-summary" class="grid-3" style="margin-bottom:20px;"></div>
+
+<div class="filter-bar">
+    <div class="form-group"><label>Date</label><input type="date" class="form-control" id="advDate"></div>
+    <div class="form-group"><label>Section</label><select class="form-select" id="advSection"><option value="">All Sections</option></select></div>
+    <div class="form-group"><label>Subject</label><select class="form-select" id="advSubject"><option value="">All Subjects</option></select></div>
+</div>
+
+<div class="card">
+    <div class="card-header">Section Attendance</div>
+    <div id="adv-attendance"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+document.getElementById('advDate').value = app.localDate();
+
+async function loadDashboard() {
+    try {
+        const result = await api.getAdviserDashboard();
+        const sections = result.data || [];
+        const container = document.getElementById('section-summary');
+
+        if (sections.length === 0) {
+            container.innerHTML = '<div class="card" style="grid-column:1/-1"><p style="text-align:center;padding:40px;color:var(--gray);">No sections assigned.</p></div>';
+            return;
+        }
+
+        const sel = document.getElementById('advSection');
+        sel.innerHTML = '<option value="">All Sections</option>';
+
+        container.innerHTML = sections.map(s => `
+            <div class="section-card">
+                <h3>${s.grade_level} — ${s.section_name}</h3>
+                <div class="stats-row">
+                    <div class="stat"><div class="val" style="color:var(--primary)">${s.total_students}</div><div class="lbl">Total</div></div>
+                    <div class="stat"><div class="val" style="color:var(--success)">${s.present_count}</div><div class="lbl">Present</div></div>
+                    <div class="stat"><div class="val" style="color:var(--warning)">${s.late_count}</div><div class="lbl">Late</div></div>
+                    <div class="stat"><div class="val" style="color:var(--danger)">${s.absent_count}</div><div class="lbl">Absent</div></div>
+                </div>
+                <div style="margin-top:8px;font-size:12px;color:var(--gray);text-align:center;">
+                    ${s.total_students > 0 ? ((s.present_count / s.total_students) * 100).toFixed(0) : 0}% attendance rate
+                </div>
+            </div>
+        `).join('');
+
+        sections.forEach(s => {
+            sel.innerHTML += `<option value="${s.section_id}">${s.grade_level} - ${s.section_name}</option>`;
+        });
+
+        loadAttendance();
+    } catch (err) {
+        document.getElementById('section-summary').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function loadAdviserSubjects(sectionId) {
+    try {
+        const me = await api.getMe();
+        const userData = me.data || me;
+        const sel = document.getElementById('advSubject');
+        sel.innerHTML = '<option value="">All Subjects</option>';
+
+        let url = `/teacher-subjects?teacher_id=${userData.user_id}`;
+        if (sectionId) url += `&section_id=${sectionId}`;
+
+        const r = await api.get(url);
+        if (r.data && r.data.length > 0) {
+            r.data.forEach(ts => {
+                sel.innerHTML += `<option value="${ts.subject_id}">${ts.subject_code} - ${ts.subject_name}</option>`;
+            });
+            return;
+        }
+
+        // Fallback: filter by major
+        if (userData.specialization) {
+            const mappedNames = app.getMajorSubjects(userData.specialization);
+            if (mappedNames.length > 0) {
+                const allSubs = await api.get('/subjects');
+                const filtered = (allSubs.data || []).filter(s => mappedNames.includes(s.subject_name));
+                if (filtered.length > 0) {
+                    filtered.forEach(s => {
+                        sel.innerHTML += `<option value="${s.subject_id}">${s.subject_code} - ${s.subject_name}</option>`;
+                    });
+                    return;
+                }
+            }
+        }
+
+        // Final fallback: show all subjects
+        const allSubs = await api.get('/subjects');
+        (allSubs.data || []).forEach(s => {
+            sel.innerHTML += `<option value="${s.subject_id}">${s.subject_code} - ${s.subject_name}</option>`;
+        });
+    } catch (_) {}
+}
+
+function parseSubjectId(remarks) {
+    if (!remarks) return null;
+    const m = remarks.match(/\[Subject:\s*(\d+)\]/);
+    return m ? parseInt(m[1]) : null;
+}
+
+async function loadAttendance() {
+    try {
+        const date = document.getElementById('advDate').value;
+        const sectionId = document.getElementById('advSection').value || null;
+        const result = await api.getAdviserAttendance(date, sectionId);
+        let records = result.data || [];
+
+        const subjectFilter = parseInt(document.getElementById('advSubject').value);
+        if (subjectFilter) {
+            records = records.filter(r => parseSubjectId(r.remarks) === subjectFilter);
+        }
+
+        const present = records.filter(r => r.status === 'Present').length;
+        const late = records.filter(r => r.status === 'Late').length;
+        const absent = records.filter(r => r.status === 'Absent').length;
+
+        let html = `<div style="display:flex;gap:20px;padding:8px 16px;background:#f8fafc;border-radius:8px;margin-bottom:12px;">
+            <div style="text-align:center;"><div style="font-size:22px;font-weight:700;color:var(--primary)">${records.length}</div><div style="font-size:12px;color:var(--gray);">Total</div></div>
+            <div style="text-align:center;"><div style="font-size:22px;font-weight:700;color:var(--success)">${present}</div><div style="font-size:12px;color:var(--gray);">Present</div></div>
+            <div style="text-align:center;"><div style="font-size:22px;font-weight:700;color:var(--warning)">${late}</div><div style="font-size:12px;color:var(--gray);">Late</div></div>
+            <div style="text-align:center;"><div style="font-size:22px;font-weight:700;color:var(--danger)">${absent}</div><div style="font-size:12px;color:var(--gray);">Absent</div></div>
+        </div>`;
+
+        html += `<div class="table-responsive"><table class="table"><thead><tr>
+            <th style="width:40px;"></th>
+            <th>Student Name</th><th>Student #</th><th>Section</th><th>Time In</th><th>Time Out</th><th>Status</th>
+        </tr></thead><tbody>`;
+
+        if (records.length === 0) {
+            html += '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray);">No records for this date.</td></tr>';
+        }
+
+        records.forEach(r => {
+            const photo = r.student_photo
+                ? `<img src="${r.student_photo}" class="adv-photo">`
+                : `<div class="adv-photo-pl">${(r.student_name || '?')[0]}</div>`;
+            html += `<tr>
+                <td>${photo}</td>
+                <td><strong>${r.student_name}</strong></td>
+                <td>${r.student_number}</td>
+                <td>${r.grade_level} - ${r.section_name}</td>
+                <td>${app.formatTime(r.time_in)}</td>
+                <td>${app.formatTime(r.time_out)}</td>
+                <td>${app.statusBadge(r.status)}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        document.getElementById('adv-attendance').innerHTML = html;
+    } catch (err) {
+        document.getElementById('adv-attendance').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+// Date change triggers reload
+document.getElementById('advDate').addEventListener('change', loadAttendance);
+document.getElementById('advSection').addEventListener('change', function() {
+    const sectionId = this.value || null;
+    loadAdviserSubjects(sectionId);
+    loadAttendance();
+});
+document.getElementById('advSubject').addEventListener('change', loadAttendance);
+
+loadDashboard();
+loadAdviserSubjects(null);
+</script>
+</body></html>
+

@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registration Approvals</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .reg-row:hover { background:#f8fafc; }
+    .pending-count { display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;font-size:13px;font-weight:600; }
+    .pending-count.has { background:#fef3c7;color:#d97706; }
+    .pending-count.none { background:#f0fdf4;color:#16a34a; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="filter-bar">
+    <div class="form-group"><label>Status</label><select class="form-select" id="statusFilter" onchange="loadRegistrations()"><option value="">All</option><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select></div>
+    <div class="form-group"><input type="search" class="form-control" id="searchReg" placeholder="Search name, email..." oninput="loadRegistrations()"></div>
+    <span id="pendingBadge"></span>
+</div>
+
+<div class="card">
+    <div id="registrations-table"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+async function loadRegistrations() {
+    try {
+        const status = document.getElementById('statusFilter').value;
+        const result = await api.getRegistrations(status || null);
+        const registrations = result.data || [];
+
+        const search = document.getElementById('searchReg').value.toLowerCase();
+        const filtered = registrations.filter(r =>
+            (r.first_name + ' ' + r.last_name + r.email).toLowerCase().includes(search)
+        );
+
+        const pending = registrations.filter(r => r.approval_status === 'Pending').length;
+        document.getElementById('pendingBadge').innerHTML = pending > 0
+            ? `<span class="pending-count has">⏳ ${pending} pending</span>`
+            : `<span class="pending-count none">✓ No pending</span>`;
+
+        let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th>Name</th><th>Email</th><th>Contact</th><th>Role</th><th>Submitted</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody>`;
+
+        if (filtered.length === 0) {
+            html += '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray);">No registrations found.</td></tr>';
+        }
+
+        filtered.forEach(r => {
+            html += `<tr class="reg-row">
+                <td><strong>${r.first_name} ${r.last_name}</strong></td>
+                <td>${r.email}</td>
+                <td>${r.contact_number || '-'}</td>
+                <td><span class="badge badge-info">${r.role_name}</span></td>
+                <td>${app.formatDate(r.created_at)}</td>
+                <td>${app.statusBadge(r.approval_status)}</td>
+                <td class="flex gap-10">
+                    ${r.approval_status === 'Pending' ? `
+                        <button class="btn btn-sm btn-success" onclick="approve(${r.registration_id})">✓ Approve</button>
+                        <button class="btn btn-sm btn-danger" onclick="reject(${r.registration_id})">✗ Reject</button>
+                    ` : '<span style="color:var(--gray);font-size:13px;">—</span>'}
+                </td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        document.getElementById('registrations-table').innerHTML = html;
+    } catch (err) {
+        document.getElementById('registrations-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function approve(id) {
+    if (!await app.confirmAction('Approve this registration?')) return;
+    try { await api.approveRegistration(id); app.showAlert('Registration approved'); loadRegistrations(); }
+    catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+async function reject(id) {
+    if (!await app.confirmAction('Reject this registration?')) return;
+    try { await api.rejectRegistration(id); app.showAlert('Registration rejected'); loadRegistrations(); }
+    catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+loadRegistrations();
+</script>
+</body></html>
+

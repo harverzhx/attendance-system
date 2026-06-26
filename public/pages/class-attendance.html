@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Attendance - Gate Attendance System</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .att-row { display:flex; align-items:center; gap:12px; padding:10px 14px; border-bottom:1px solid var(--border); transition:background 0.2s; }
+        .att-row:hover { background:#f8fafc; }
+        .att-unmarked { border-left:4px solid #f59e0b; background:#fffef5; }
+        .att-unmarked:hover { background:#fffbe0; }
+        .att-row .info { flex:1; min-width:0; }
+        .att-row .info .name { font-weight:600; }
+        .att-row .info .detail { font-size:12px; color:var(--gray); }
+        .att-photo { width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+        .att-photo-pl { width:36px; height:36px; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#64748b; flex-shrink:0; }
+        .status-btn { padding:6px 16px; border:2px solid var(--border); border-radius:20px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s; background:#fff; }
+        .status-btn:hover { transform:scale(1.05); }
+        .status-btn.active-present { background:var(--success); color:#fff; border-color:var(--success); }
+        .status-btn.active-late { background:var(--warning); color:#fff; border-color:var(--warning); }
+        .status-btn.active-absent { background:var(--danger); color:#fff; border-color:var(--danger); }
+        .status-btn.present { border-color:var(--success); color:var(--success); }
+        .status-btn.late { border-color:var(--warning); color:var(--warning); }
+        .status-btn.absent { border-color:var(--danger); color:var(--danger); }
+        @media (max-width:480px) { .status-btn { padding:5px 10px; font-size:12px; } .att-row { flex-wrap:wrap; gap:8px; } .att-row .info { width:100%; } .att-row > div:last-child { width:100%; justify-content:center; } }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main-content">
+        <div class="topbar" id="topbar"></div>
+        <div id="alert-container"></div>
+
+        <div class="filter-bar" id="staffFilter" style="display:none;">
+            <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="dateFrom"></div>
+            <div class="form-group"><label>To Date</label><input type="date" class="form-control" id="dateTo"></div>
+            <button class="btn btn-primary" onclick="loadAttendanceRecords()">View Attendance</button>
+        </div>
+
+        <div class="filter-bar" id="standardFilter">
+            <div class="form-group"><label>Grade &amp; Section</label><select class="form-select" id="sectionSelect"><option value="">Select Grade &amp; Section</option></select></div>
+            <div class="form-group"><label>Subject</label><select class="form-select" id="subjectSelect"><option value="">Select Subject</option></select></div>
+            <div class="form-group"><label>Date</label><input type="date" class="form-control" id="attDate"></div>
+            <button class="btn btn-primary" onclick="loadStudents()">Load Students</button>
+            <button class="btn btn-success" onclick="saveAttendance()">Save Attendance</button>
+        </div>
+
+        <div id="scannerBar">
+            <div class="filter-bar" style="background:var(--success-bg, #f0fdf4);border:1px solid var(--success);">
+                <div class="form-group" style="flex:1;"><label>Scan Barcode to Mark Present</label>
+                    <div class="scan-input-row">
+                        <input type="text" class="form-control" id="barcodeInput" placeholder="Scan or type barcode here..." autofocus>
+                        <button class="btn btn-sm btn-primary" onclick="openCameraScanner()" type="button">📷 Camera</button>
+                    </div>
+                </div>
+                <div class="form-group"><label>&nbsp;</label><div id="scanFeedback" style="font-size:14px;font-weight:600;padding:8px 0;">Ready</div></div>
+            </div>
+        </div>
+        
+        <!-- Camera Scanner Overlay -->
+        <div id="cameraOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:3000;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:12px;padding:16px;width:100%;max-width:500px;text-align:center;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <h3 style="margin:0;">📷 Scan Barcode</h3>
+                    <button onclick="closeCameraScanner()" class="close-camera-btn" style="background:none;border:none;cursor:pointer;color:var(--gray);">&times;</button>
+                </div>
+                <div id="cameraReader" style="width:100%;min-height:250px;background:#000;border-radius:8px;overflow:hidden;"></div>
+                <p id="cameraStatus" style="margin:8px 0 0;font-size:13px;color:var(--gray);">Point camera at student barcode</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="flex-between">
+                <div class="card-header">Class Attendance</div>
+                <div><span id="summaryBar" style="font-size:14px;"></span></div>
+            </div>
+            <div id="studentList"><p style="text-align:center;color:var(--gray);padding:40px;">Select filters above.</p></div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js?v=1"></script>
+    <script>
+        auth.requireAuth();
+        const role = auth.getRole();
+        document.getElementById('attDate').value = app.localDate();
+
+        // Role-based UI setup
+        if (role === 'Staff') {
+            document.getElementById('staffFilter').style.display = '';
+            document.getElementById('standardFilter').style.display = 'none';
+            document.getElementById('scannerBar').style.display = 'none';
+            document.getElementById('dateFrom').value = app.localDate();
+            document.getElementById('dateTo').value = app.localDate();
+            document.querySelector('.card-header').textContent = 'Attendance Records';
+            document.getElementById('studentList').innerHTML = '<p style="text-align:center;color:var(--gray);padding:40px;">Select date range and click View Attendance.</p>';
+        } else {
+            document.getElementById('staffFilter').style.display = 'none';
+            document.getElementById('standardFilter').style.display = '';
+        }
+
+        // Store attendance state: { student_id: 'Present'|'Late'|'Absent' }
+        let attState = {};
+
+        async function loadSections() {
+            const sel = document.getElementById('sectionSelect');
+            try {
+                let sections;
+                if (role === 'Admin') {
+                    const r = await api.getSections();
+                    sections = r.data || [];
+                } else {
+                    const r = await api.get('/teacher-sections');
+                    sections = r.data || [];
+                }
+                sections.forEach(s => {
+                    sel.innerHTML += `<option value="${s.section_id}">${s.grade_level || ''} ${s.section_name}</option>`;
+                });
+            } catch (_) {}
+        }
+
+        async function loadSubjectsForSection(sectionId) {
+            const subjSel = document.getElementById('subjectSelect');
+            subjSel.innerHTML = '<option value="">Select Subject (optional)</option>';
+            if (!sectionId) return;
+            try {
+                let teacherId = null;
+                let specialization = null;
+
+                if (role === 'Teacher' || role === 'Adviser') {
+                    const me = await api.getMe();
+                    const userData = me.data || me;
+                    teacherId = userData.user_id;
+                    specialization = userData.specialization || null;
+                } else {
+                    const tsR = await api.get('/teacher-sections');
+                    const teachersInSection = (tsR.data || []).filter(ts => ts.section_id == sectionId);
+                    if (teachersInSection.length > 0) {
+                        teacherId = teachersInSection[0].teacher_id;
+                        try {
+                            const usersR = await api.getUsers();
+                            const t = (usersR.data || []).find(u => u.user_id == teacherId);
+                            if (t) specialization = t.specialization || null;
+                        } catch (_) {}
+                    }
+                }
+
+                if (!teacherId) return;
+
+                // Show only explicitly assigned subjects
+                const r = await api.get(`/teacher-subjects?teacher_id=${teacherId}&section_id=${sectionId}`);
+                if (r.data && r.data.length > 0) {
+                    r.data.forEach(ts => {
+                        subjSel.innerHTML += `<option value="${ts.subject_id}">${ts.subject_code} - ${ts.subject_name}</option>`;
+                    });
+                }
+            } catch (_) {}
+        }
+
+        function clearStudents() {
+            document.getElementById('studentList').innerHTML = '<p style="text-align:center;color:var(--gray);padding:40px;">Select filters above.</p>';
+            document.getElementById('summaryBar').innerHTML = '';
+            attState = {};
+        }
+
+        document.getElementById('sectionSelect').addEventListener('change', function() {
+            clearStudents();
+            document.getElementById('subjectSelect').innerHTML = '<option value="">Select Subject</option>';
+            loadSubjectsForSection(this.value);
+            if (role === 'Admin') loadStudents();
+        });
+        document.getElementById('subjectSelect').addEventListener('change', function() {
+            clearStudents();
+            if (!this.value) return;
+            if (role !== 'Admin') loadStudents();
+        });
+        document.getElementById('attDate').addEventListener('change', loadStudents);
+
+        async function loadStudents() {
+            const sectionId = document.getElementById('sectionSelect').value;
+            if (!sectionId) { app.showAlert('Please select a section', 'danger'); return; }
+            const date = document.getElementById('attDate').value;
+            const subjectId = document.getElementById('subjectSelect').value;
+
+            if (role !== 'Admin' && !subjectId) { app.showAlert('Please select a subject', 'danger'); return; }
+
+            try {
+                const r = await api.get(`/class-attendance?section_id=${sectionId}&date=${date}`);
+                const students = r.data || [];
+                attState = {};
+                studentMap = {}; // Reset studentMap
+                const container = document.getElementById('studentList');
+
+                if (students.length === 0) {
+                    container.innerHTML = '<p style="text-align:center;color:var(--gray);padding:40px;">No students in this section.</p>';
+                    updateSummary();
+                    return;
+                }
+
+                // Initialize state from existing attendance and populate studentMap
+                students.forEach(s => {
+                    if (s.att_status) attState[s.student_id] = s.att_status;
+                    studentMap[s.student_id] = {
+                        name: s.first_name + ' ' + s.last_name,
+                        number: s.student_number || '',
+                        barcode: s.barcode || '',
+                        lrn: s.lrn || ''
+                    };
+                });
+
+                // Sort: unmarked students first
+                const sorted = [...students].sort((a, b) => {
+                    const aMarked = attState[a.student_id] ? 1 : 0;
+                    const bMarked = attState[b.student_id] ? 1 : 0;
+                    return aMarked - bMarked;
+                });
+
+                container.innerHTML = sorted.map(s => {
+                    const marked = attState[s.student_id];
+                    const photo = s.photo
+                        ? `<img src="${s.photo}" class="att-photo">`
+                        : `<div class="att-photo-pl">${(s.first_name || '?')[0]}</div>`;
+                    return `<div class="att-row ${marked ? '' : 'att-unmarked'}" data-id="${s.student_id}">
+                        ${photo}
+                        <div class="info">
+                            <div class="name">${s.first_name} ${s.last_name}</div>
+                            <div class="detail">${s.student_number || ''} ${s.grade_level || ''} ${s.section_name || ''}</div>
+                        </div>
+                        <div style="display:flex;gap:6px;">
+                            <button class="status-btn present ${marked === 'Present' ? 'active-present' : ''}" onclick="setStatus(${s.student_id}, 'Present')">Present</button>
+                            <button class="status-btn late ${marked === 'Late' ? 'active-late' : ''}" onclick="setStatus(${s.student_id}, 'Late')">Late</button>
+                            <button class="status-btn absent ${marked === 'Absent' ? 'active-absent' : ''}" onclick="setStatus(${s.student_id}, 'Absent')">Absent</button>
+                        </div>
+                    </div>`;
+                }).join('');
+                updateSummary();
+            } catch (err) {
+                document.getElementById('studentList').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+        }
+
+        async function loadAttendanceRecords() {
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            if (!dateFrom || !dateTo) { app.showAlert('Select date range', 'danger'); return; }
+
+            try {
+                const r = await api.get(`/attendance?date_from=${dateFrom}&date_to=${dateTo}`);
+                const records = r.data || [];
+                const container = document.getElementById('studentList');
+
+                if (records.length === 0) {
+                    container.innerHTML = '<p style="text-align:center;color:var(--gray);padding:40px;">No attendance records found for this date range.</p>';
+                    document.getElementById('summaryBar').innerHTML = '';
+                    return;
+                }
+
+                // Group by student
+                const byStudent = {};
+                records.forEach(rec => {
+                    const key = rec.student_id || rec.id;
+                    if (!byStudent[key]) {
+                        byStudent[key] = { name: rec.student || rec.student_name || 'Unknown', section: rec.section || '', photo: rec.photo, records: [], total: 0, present: 0, late: 0, absent: 0 };
+                    }
+                    byStudent[key].records.push(rec);
+                    byStudent[key].total++;
+                    const status = (rec.status || rec.scan_type || '').toUpperCase();
+                    if (status === 'PRESENT') byStudent[key].present++;
+                    else if (status === 'LATE') byStudent[key].late++;
+                    else byStudent[key].absent++;
+                });
+
+                container.innerHTML = Object.values(byStudent).map(s => {
+                    const photo = s.photo
+                        ? `<img src="${s.photo}" class="att-photo">`
+                        : `<div class="att-photo-pl">${(s.name || '?')[0]}</div>`;
+                    const latest = s.records[s.records.length - 1];
+                    return `<div class="att-row">
+                        ${photo}
+                        <div class="info">
+                            <div class="name">${s.name}</div>
+                            <div class="detail">${s.section} · ${s.total} day(s)</div>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:13px;">
+                            <span style="color:var(--success);font-weight:600;">✓ ${s.present}</span>
+                            <span style="color:var(--warning);font-weight:600;">⏰ ${s.late}</span>
+                            <span style="color:var(--danger);font-weight:600;">✗ ${s.absent}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+                document.getElementById('summaryBar').innerHTML = `<span style="font-weight:600;">${records.length} total records · ${Object.keys(byStudent).length} students</span>`;
+            } catch (err) {
+                document.getElementById('studentList').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+        }
+
+        function setStatus(studentId, status) {
+            if (attState[studentId] === status) {
+                delete attState[studentId];
+            } else {
+                attState[studentId] = status;
+            }
+            // Update button styles
+            const row = document.querySelector(`.att-row[data-id="${studentId}"]`);
+            if (!row) return;
+            row.querySelectorAll('.status-btn').forEach(btn => {
+                const s = btn.classList.contains('present') ? 'Present' : btn.classList.contains('late') ? 'Late' : 'Absent';
+                btn.className = `status-btn ${s.toLowerCase()}`;
+                if (attState[studentId] === s) btn.classList.add(`active-${s.toLowerCase()}`);
+            });
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const total = document.querySelectorAll('.att-row').length;
+            const present = Object.values(attState).filter(v => v === 'Present').length;
+            const late = Object.values(attState).filter(v => v === 'Late').length;
+            const absent = Object.values(attState).filter(v => v === 'Absent').length;
+            const el = document.getElementById('summaryBar');
+            const marked = present + late + absent;
+            const unmarked = total - marked;
+            el.innerHTML = `<span style="color:var(--success);">✓ ${present}</span> · <span style="color:var(--warning);">⏰ ${late}</span> · <span style="color:var(--danger);">✗ ${absent}</span> · Total: ${marked}
+                <span style="color:var(--gray);margin-left:16px;font-weight:${unmarked > 0 ? 'bold' : 'normal'};">⬜ ${unmarked} unmarked</span>`;
+        }
+
+        async function saveAttendance() {
+            const sectionId = document.getElementById('sectionSelect').value;
+            if (!sectionId) { app.showAlert('Select a section first', 'danger'); return; }
+            const date = document.getElementById('attDate').value;
+            const records = Object.entries(attState).map(([student_id, status]) => ({ student_id: parseInt(student_id), status }));
+
+            if (records.length === 0) { app.showAlert('No attendance to save', 'warning'); return; }
+
+            try {
+                const subjectId = document.getElementById('subjectSelect').value;
+                await api.post('/class-attendance/save', { date, records, subject_id: subjectId || null });
+                app.showAlert('Attendance saved successfully!', 'success');
+            } catch (err) {
+                app.showAlert('Failed to save: ' + err.message, 'danger');
+            }
+        }
+
+        // Barcode scanner for quick marking
+        let studentMap = {};
+        let cameraStream = null;
+        let scanInterval = null;
+
+        async function findAndMarkStudent(code) {
+            const feedback = document.getElementById('scanFeedback');
+            let found = null;
+
+            for (const [id, info] of Object.entries(studentMap)) {
+                if (info.number === code || info.barcode === code || info.lrn === code) { found = id; break; }
+            }
+
+            if (!found) {
+                try {
+                    const r = await api.get('/students?search=' + encodeURIComponent(code) + '&section_id=' + document.getElementById('sectionSelect').value);
+                    const students = r.data || [];
+                    if (students.length > 0) {
+                        found = students[0].student_id;
+                        if (!studentMap[found]) {
+                            studentMap[found] = { name: students[0].first_name + ' ' + students[0].last_name, number: students[0].student_number };
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            if (found) {
+                setStatus(parseInt(found), 'Present');
+                const name = studentMap[found]?.name || `Student #${found}`;
+                feedback.innerHTML = `✅ ${name} marked Present`;
+                feedback.style.color = 'var(--success)';
+            } else {
+                feedback.innerHTML = '❌ Student not found in this section';
+                feedback.style.color = 'var(--danger)';
+            }
+
+            setTimeout(() => { feedback.innerHTML = 'Ready'; feedback.style.color = ''; }, 2000);
+        }
+
+        function openCameraScanner() {
+            const overlay = document.getElementById('cameraOverlay');
+            overlay.style.display = 'flex';
+            const status = document.getElementById('cameraStatus');
+            status.textContent = 'Requesting camera...';
+
+            const reader = document.getElementById('cameraReader');
+            reader.innerHTML = '';
+            status.textContent = 'Starting camera...';
+
+            const onDetect = (code) => {
+                closeCameraScanner();
+                document.getElementById('barcodeInput').value = code;
+                findAndMarkStudent(code);
+            };
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+                if (!navigator.getUserMedia) {
+                    status.innerHTML = 'Camera not supported. Use Chrome or Edge browser, or type barcode manually. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+                    return;
+                }
+            }
+
+            status.textContent = 'Starting camera...';
+
+            function startCamera(useBack) {
+                if (useBack === undefined) useBack = true;
+                return navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: useBack ? 'environment' : 'user' } });
+            }
+
+            function startCameraExact() {
+                return navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { exact: 'environment' } } });
+            }
+
+            startCameraExact().catch(function() { return startCamera(true); }).then(function(stream) {
+                cameraStream = stream;
+                status.textContent = 'Scanning...';
+
+                if ('BarcodeDetector' in window) {
+                    const video = document.createElement('video');
+                    video.setAttribute('playsinline', '');
+                    video.setAttribute('autoplay', '');
+                    video.style.cssText = 'width:100%;height:auto;max-height:300px;object-fit:cover;border-radius:8px;';
+                    reader.appendChild(video);
+                    video.srcObject = stream;
+                    video.play();
+
+                    const detector = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_39'] });
+                    let detectStart = Date.now();
+                    const hintTimeout = setTimeout(() => {
+                        if (status) status.innerHTML = 'Point camera at barcode and hold steady. <button onclick="closeCameraScanner()" class="btn btn-sm btn-secondary" style="margin-top:4px;">Cancel</button>';
+                    }, 8000);
+
+                    function detectFrame() {
+                        if (!video || video.readyState < 2) { scanInterval = requestAnimationFrame(detectFrame); return; }
+                        detector.detect(video).then(barcodes => {
+                            if (barcodes.length > 0) { clearTimeout(hintTimeout); onDetect(barcodes[0].rawValue); return; }
+                            if (Date.now() - detectStart > 15000) {
+                                if (status) status.innerHTML = 'No barcode found. Try moving closer or use text input. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+                                return;
+                            }
+                            scanInterval = requestAnimationFrame(detectFrame);
+                        }).catch(() => {
+                            scanInterval = requestAnimationFrame(detectFrame);
+                        });
+                    }
+                    detectFrame();
+                } else {
+                    status.textContent = 'Loading scanner...';
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
+                    script.onload = () => {
+                        status.textContent = 'Starting decoder...';
+                        reader.innerHTML = '';
+                        const video = document.createElement('video');
+                        video.setAttribute('playsinline', '');
+                        video.setAttribute('autoplay', '');
+                        video.style.cssText = 'width:100%;height:auto;max-height:300px;object-fit:cover;border-radius:8px;';
+                        reader.appendChild(video);
+                        video.srcObject = stream;
+                        video.play();
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        let scanning = true;
+
+                        function decodeFrame() {
+                            if (!scanning) return;
+                            if (video.readyState >= 2 && video.videoWidth > 0) {
+                                canvas.width = 320;
+                                canvas.height = 240;
+                                ctx.drawImage(video, 0, 0, 320, 240);
+                                const dataUrl = canvas.toDataURL('image/png');
+                                Quagga.decodeSingle({
+                                    decoder: { readers: ['code_128_reader'] },
+                                    locate: false,
+                                    src: dataUrl
+                                }, (result) => {
+                                    if (result && result.codeResult && result.codeResult.code) {
+                                        scanning = false;
+                                        onDetect(result.codeResult.code);
+                                    } else {
+                                        setTimeout(decodeFrame, 150);
+                                    }
+                                });
+                            } else {
+                                setTimeout(decodeFrame, 150);
+                            }
+                        }
+                        decodeFrame();
+                        cameraStream._stopScan = () => { scanning = false; };
+                    };
+                    script.onerror = () => {
+                        status.innerHTML = 'Scanner library failed to load. Use text input instead. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+                    };
+                    document.body.appendChild(script);
+                }
+            }).catch(err => {
+                if (err.name === 'NotAllowedError') {
+                    status.innerHTML = 'Camera access denied. Allow camera in browser settings. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+                } else if (err.name === 'NotFoundError') {
+                    status.innerHTML = 'No camera found. Use text input instead. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+                } else {
+                    status.innerHTML = 'Camera error: ' + err.message + '. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+                }
+            });
+        }
+
+        function closeCameraScanner() {
+            if (scanInterval) { cancelAnimationFrame(scanInterval); clearTimeout(scanInterval); clearInterval(scanInterval); scanInterval = null; }
+            if (cameraStream) {
+                if (cameraStream._stopScan) cameraStream._stopScan();
+                if (cameraStream.getTracks) {
+                    cameraStream.getTracks().forEach(t => t.stop());
+                }
+                cameraStream = null;
+            }
+            document.getElementById('cameraOverlay').style.display = 'none';
+            document.getElementById('cameraReader').innerHTML = '';
+            const barcodeInput = document.getElementById('barcodeInput');
+            if (barcodeInput && !barcodeInput.disabled) barcodeInput.focus();
+        }
+
+        document.getElementById('barcodeInput').addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const code = e.target.value.trim();
+            if (!code) return;
+            e.target.value = '';
+            findAndMarkStudent(code);
+        });
+
+        if (role !== 'Staff') loadSections();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,30 @@
+  (function(targetId, headingTag) {
+	  var documentRef = documentRef || document;
+	    var toc = documentRef.getElementById('knowledge-sidebar');
+	    var headings = [].slice.call(documentRef.body.querySelectorAll('.knowledge_articles h1, .knowledge_articles h2, .knowledge_articles h3, .knowledge_articles h4, .knowledge_articles h5, .knowledge_articles h6'));
+	    headings.forEach(function (heading, index) {
+	    	if (heading.getAttribute("data-affix-ignore")!=null) {
+	    		return;
+	    	} 
+	    	
+	        var anchor = documentRef.createElement('a');
+	        anchor.setAttribute('name', 'toc' + index);
+	        anchor.setAttribute('id', 'toc' + index);
+	        
+	        var link = documentRef.createElement('a');
+	        link.setAttribute('href', '#toc' + index);
+	        link.setAttribute('class', 'nav-link js-scroll-trigger');
+	        link.textContent = heading.textContent;
+	        if (heading.getAttribute("data-affix-text")!=null) {
+	        	link.textContent = heading.getAttribute("data-affix-text");
+	        }
+	        
+	        var div = documentRef.createElement('li');
+	        div.setAttribute('class', heading.tagName.toLowerCase());
+	        
+	        div.appendChild(link);
+	        toc.appendChild(div);
+	        heading.parentNode.insertBefore(anchor, heading);
+	    });
+
+  })("submenu");

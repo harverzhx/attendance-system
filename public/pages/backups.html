@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backups - Gate Attendance System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main-content">
+        <div class="topbar" id="topbar"></div>
+        <div id="alert-container"></div>
+
+        <div class="flex-between mb-20">
+            <div><button class="btn btn-primary" onclick="createBackup('Full')">+ Full Backup</button>
+            <button class="btn btn-info" onclick="createBackup('Manual')">+ Manual Backup</button></div>
+        </div>
+
+        <div class="card">
+            <div id="backups-table"><div class="loading">Loading...</div></div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js?v=1"></script>
+    <script>
+        if (!auth.requireRole('Admin')) { auth.redirectToDashboard(); }
+
+        async function loadBackups() {
+            try {
+                const result = await api.getBackups();
+                const backups = result.data;
+
+                let html = `<div class="table-responsive"><table class="table"><thead><tr>
+                    <th>Filename</th><th>Type</th><th>Size</th><th>Created By</th><th>Date</th><th>Status</th><th>Actions</th>
+                </tr></thead><tbody>`;
+
+                if (backups.length === 0) {
+                    html += '<tr><td colspan="7" style="text-align:center;color:var(--gray);">No backups found.</td></tr>';
+                }
+
+                backups.forEach(b => {
+                    html += `<tr>
+                        <td>${b.filename}</td>
+                        <td><span class="badge badge-info">${b.backup_type}</span></td>
+                        <td>${b.file_size}</td>
+                        <td>${b.created_by_name || '-'}</td>
+                        <td>${app.formatDate(b.created_at)}</td>
+                        <td>${app.statusBadge(b.status)}</td>
+                        <td class="flex gap-10">
+                            <button class="btn btn-sm btn-primary" onclick="api.downloadBackup(${b.backup_id})">Download</button>
+                            <button class="btn btn-sm btn-warning" onclick="restoreBackup(${b.backup_id})">Restore</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteBackup(${b.backup_id})">Delete</button>
+                        </td>
+                    </tr>`;
+                });
+
+                html += '</tbody></table></div>';
+                document.getElementById('backups-table').innerHTML = html;
+            } catch (err) {
+                document.getElementById('backups-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+        }
+
+        async function createBackup(type) {
+            try {
+                const result = await api.createBackup(type);
+                app.showAlert(`${type} backup created successfully`);
+                loadBackups();
+            } catch (err) { app.showAlert(err.message, 'danger'); }
+        }
+
+        async function restoreBackup(id) {
+            if (!await app.confirmAction('Restore this backup? This will overwrite current data.')) return;
+            try { await api.restoreBackup(id); app.showAlert('Backup restored successfully'); loadBackups(); }
+            catch (err) { app.showAlert(err.message, 'danger'); }
+        }
+
+        async function deleteBackup(id) {
+            if (!await app.confirmAction('Delete this backup?')) return;
+            try { await api.deleteBackup(id); app.showAlert('Backup deleted'); loadBackups(); }
+            catch (err) { app.showAlert(err.message, 'danger'); }
+        }
+
+        loadBackups();
+    </script>
+</body>
+</html>
+

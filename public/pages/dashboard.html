@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Gate Attendance System</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .dash-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+        @media (max-width:768px) { .dash-grid { grid-template-columns:1fr; } }
+        .dash-full { grid-column:1/-1; }
+        .live-feed { max-height:400px; overflow-y:auto; }
+        .live-feed .feed-item { display:flex; align-items:center; gap:12px; padding:8px 12px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.2s; }
+        .live-feed .feed-item:hover { background:#f8fafc; }
+        .feed-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+        .feed-dot.entry { background:var(--success); }
+        .feed-dot.exit { background:var(--info); }
+        .alert-item { padding:10px 14px; border-left:4px solid; margin-bottom:8px; border-radius:4px; cursor:pointer; transition:background 0.2s; }
+        .alert-item:hover { background:#f8fafc; }
+        .alert-item.danger { border-color:#dc2626; background:#fef2f2; }
+        .alert-item.warning { border-color:#f59e0b; background:#fffbeb; }
+        .student-link { color:var(--primary); cursor:pointer; text-decoration:none; }
+        .student-link:hover { text-decoration:underline; }
+        .stat-card { cursor:pointer; transition:transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+        .trend-bar { display:flex; align-items:flex-end; gap:6px; height:100px; padding-top:10px; }
+        .trend-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+        .trend-stack { width:100%; display:flex; flex-direction:column-reverse; align-items:center; flex:1; }
+        .trend-seg { width:80%; border-radius:3px 3px 0 0; min-height:4px; transition:height 0.3s; }
+        .trend-seg.present { background:var(--success); }
+        .trend-seg.late { background:var(--warning); }
+        .trend-seg.absent { background:var(--danger); }
+        .trend-label { font-size:11px; color:var(--gray); }
+        .exit-chart { display:flex; gap:12px; flex-wrap:wrap; }
+        .exit-chart-item { flex:1; min-width:120px; text-align:center; padding:12px; border-radius:8px; background:#f8fafc; cursor:pointer; transition:transform 0.2s; }
+        .exit-chart-item:hover { transform:scale(1.05); }
+        .exit-chart-value { font-size:24px; font-weight:700; }
+        .section-rank { cursor:pointer; transition:background 0.2s; }
+        .section-rank:hover { background:#f8fafc; }
+        .scroll-list { max-height:300px; overflow-y:auto; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main-content">
+        <div class="topbar" id="topbar"></div>
+        <div id="alert-container"></div>
+
+        <div id="dashboard-content">
+            <div class="grid-4" id="stat-cards"></div>
+
+            <div class="dash-grid" id="adminSections">
+                <div class="card dash-full">
+                    <div class="card-header">Live Scan Feed <small style="font-weight:400;color:var(--gray);margin-left:8px;">(Click to view details)</small></div>
+                    <div class="live-feed" id="liveFeed"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Inside Campus <a href="/pages/scan-logs.html" style="float:right;font-size:13px;font-weight:400;">View All →</a></div>
+                    <div class="scroll-list" id="insideList"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Outside Campus <a href="/pages/scan-logs.html" style="float:right;font-size:13px;font-weight:400;">View All →</a></div>
+                    <div class="scroll-list" id="outsideList"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Exit Types Today</div>
+                    <div id="exitTypeChart"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">7-Day Attendance Trend</div>
+                    <div id="trendChart"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card dash-full">
+                    <div class="card-header">Alerts <a href="/pages/attendance-records.html" style="float:right;font-size:13px;font-weight:400;">View All →</a></div>
+                    <div id="alertsSection"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Active Pull-Outs <a href="/pages/pull-outs.html" style="float:right;font-size:13px;font-weight:400;">View All →</a></div>
+                    <div class="scroll-list" id="pullOutsList"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Pending Excuses <a href="/pages/excuses.html" style="float:right;font-size:13px;font-weight:400;">View All →</a></div>
+                    <div class="scroll-list" id="excusesList"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card dash-full">
+                    <div class="card-header">Parent Notification Status Today <a href="/pages/email-logs.html" style="float:right;font-size:13px;font-weight:400;">View All →</a></div>
+                    <div id="emailStats"><div class="loading">Loading...</div></div>
+                </div>
+
+                <div class="card dash-full">
+                    <div class="card-header">Section Attendance Ranking</div>
+                    <div id="sectionRank"><div class="loading">Loading...</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js?v=1"></script>
+    <script>
+        if (!auth.requireAuth()) { auth.redirectToDashboard(); }
+
+        const role = auth.getRole();
+        if (role !== 'Admin') document.getElementById('adminSections').style.display = 'none';
+
+        function studentLink(id, name) {
+            return `<a class="student-link" href="/pages/students.html" onclick="localStorage.setItem('studentId','${id}');return true;">${name}</a>`;
+        }
+
+        function studentPhotoHtml(s, size = 28) {
+            if (s.photo) return `<img src="${s.photo}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle;margin-right:6px;">`;
+            const initial = (s.student_name || s.first_name || '?')[0];
+            return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:${Math.round(size * 0.45)}px;flex-shrink:0;vertical-align:middle;margin-right:6px;">${initial}</div>`;
+        }
+
+        async function loadDashboard() {
+            try {
+                const adminSec = document.getElementById('adminSections');
+                if (role === 'Admin') {
+                    adminSec.style.display = 'grid';
+                    const res = await api.get('/dashboard/admin-full');
+                    const d = res.data;
+                    if (!d) return;
+                    renderStatCards(d);
+                    renderLiveFeed(d.recent_scans || []);
+                    renderInsideOutside(d.gate);
+                    renderExitTypes(d.exit_type_summary || []);
+                    renderTrend(d.trend_7day || []);
+                    renderAlerts(d.alerts);
+                    renderEmailStats(d.email_stats, d.failed_emails || []);
+                    renderSectionRank(d.section_ranking || []);
+                    renderPullOuts(d.active_pull_outs || []);
+                    renderPendingExcuses(d.pending_excuses || []);
+                } else if (role === 'Teacher') {
+                    adminSec.style.display = 'none';
+                    const r = await api.getTeacherDashboard();
+                    const d = r.data || {};
+                    const sections = d.sections || [];
+                    const inside = d.inside_students || [];
+                    const totalStudents = d.total_my_students || 0;
+
+                    // Get teacher's subjects for display
+                    let teacherSubjects = '';
+                    try {
+                        const subjR = await api.get('/teacher-subjects');
+                        const subs = subjR.data || [];
+                        const unique = [...new Set(subs.map(s => s.subject_name))];
+                        teacherSubjects = unique.join(', ');
+                    } catch(_) {}
+
+                    document.getElementById('stat-cards').innerHTML = `
+                        <div class="card stat-card primary"><div class="stat-icon">📚</div><div class="stat-value">${sections.length}</div><div class="stat-label">My Sections</div></div>
+                        <div class="card stat-card info"><div class="stat-icon">🎓</div><div class="stat-value">${totalStudents}</div><div class="stat-label">My Students</div></div>
+                        <div class="card stat-card success" onclick="window.location='/pages/class-attendance.html'"><div class="stat-icon">🏫</div><div class="stat-value">${inside.length}</div><div class="stat-label">Inside Campus</div></div>
+                        <div class="card stat-card warning" onclick="window.location='/pages/class-attendance.html'"><div class="stat-icon">📝</div><div class="stat-value">Take Today</div><div class="stat-label">Class Attendance</div></div>
+                        ${teacherSubjects ? `<div class="card stat-card" style="background:#f0f9ff;grid-column:span 4;"><div class="stat-icon">📖</div><div class="stat-value" style="font-size:16px;">${teacherSubjects}</div><div class="stat-label">My Subjects / Specialization</div></div>` : ''}
+                    `;
+
+                    let html = `<div class="dash-grid">`;
+
+                    // My Sections
+                    html += `<div class="card"><div class="card-header">My Sections</div><div style="padding:8px 0;">`;
+                    if (sections.length === 0) html += '<p style="text-align:center;color:var(--gray);padding:20px;">No sections assigned.</p>';
+                    else sections.forEach(s => {
+                        html += `<div class="feed-item" onclick="window.location='/pages/class-attendance.html'" style="cursor:pointer;">
+                            <strong>${s.grade_level || ''} ${s.section_name}</strong>
+                            <span style="font-size:12px;color:var(--gray);margin-left:8px;">${s.student_count} students</span>
+                            ${s.subjects ? `<br><small style="color:var(--primary);">📖 ${s.subjects}</small>` : ''}
+                        </div>`;
+                    });
+                    html += `</div></div>`;
+
+                    // Inside Campus
+                    html += `<div class="card"><div class="card-header">My Students Inside Campus</div><div class="scroll-list">`;
+                    if (inside.length === 0) html += '<p style="text-align:center;color:var(--gray);padding:20px;">None of your students are inside yet.</p>';
+                    else inside.forEach(s => {
+                        html += `<div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+                            ${studentPhotoHtml(s, 28)}
+                            <div style="flex:1;">
+                                <strong>${s.student_name}</strong>
+                                <span style="font-size:12px;color:var(--gray);margin-left:4px;">${s.section_name || ''}</span>
+                            </div>
+                            <span style="font-size:12px;color:var(--gray);white-space:nowrap;">${app.formatTime(s.last_entry)}</span>
+                        </div>`;
+                    });
+                    html += `</div></div></div>`;
+
+                    // Pull-outs for teacher
+                    html += `<div class="dash-grid" style="margin-top:20px;">
+                        <div class="card"><div class="card-header">Active Pull-Outs <a href="/pages/pull-outs.html" style="float:right;font-size:13px;font-weight:400;">View All →</a></div><div>`;
+                    const myPullOuts = d.active_pull_outs || [];
+                    if (myPullOuts.length === 0) html += '<p style="text-align:center;color:var(--gray);padding:16px;font-size:13px;">No active pull-outs</p>';
+                    else myPullOuts.forEach(o => {
+                        html += `<div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;">
+                            <strong>${o.student_name}</strong> — ${o.picked_up_by}
+                            <span style="float:right;color:var(--gray);">${app.formatTime(o.time_pulled)}</span>
+                        </div>`;
+                    });
+                    html += `</div></div>
+                        <div class="card"><div class="card-header">Pending Excuses <a href="/pages/excuses.html" style="float:right;font-size:13px;font-weight:400;">Review →</a></div><div>`;
+                    const myExcuses = d.pending_excuses || [];
+                    if (myExcuses.length === 0) html += '<p style="text-align:center;color:var(--gray);padding:16px;font-size:13px;">No pending excuses</p>';
+                    else myExcuses.forEach(e => {
+                        html += `<div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;cursor:pointer;" onclick="window.location='/pages/excuses.html'">
+                            <strong>${e.student_name}</strong>
+                            <span class="badge ${e.type === 'Absent' ? 'badge-out' : 'badge-warning'}">${e.type}</span>
+                            <span style="color:var(--gray);margin-left:4px;">${e.reason.substring(0, 40)}</span>
+                        </div>`;
+                    });
+                    html += `</div></div></div>`;
+
+                    document.querySelector('#dashboard-content').insertAdjacentHTML('beforeend', html);
+                } else {
+                    // Simple dashboard for other roles
+                    const apiCall = role === 'Staff' ? api.getStaffDashboard() :
+                                    role === 'Viewer' ? api.getViewerDashboard() :
+                                    api.getTeacherDashboard();
+                    const result = await apiCall;
+                    const data = result.data;
+                    adminSec.style.display = 'none';
+                    document.getElementById('stat-cards').innerHTML = `
+                        <div class="card stat-card primary"><div class="stat-icon">📊</div><div class="stat-value">${data.attendance_today || data.present_today || 0}</div><div class="stat-label">Today's Attendance</div></div>
+                        <div class="card stat-card warning"><div class="stat-icon">⏰</div><div class="stat-value">${data.late_today || 0}</div><div class="stat-label">Late Today</div></div>
+                        <div class="card stat-card success"><div class="stat-icon">🏫</div><div class="stat-value">0</div><div class="stat-label">Inside Campus</div></div>
+                        <div class="card stat-card secondary"><div class="stat-icon">🏠</div><div class="stat-value">0</div><div class="stat-label">Outside Campus</div></div>
+                    `;
+                }
+            } catch (err) {
+                document.getElementById('stat-cards').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+        }
+
+        function renderPullOuts(outs) {
+            const el = document.getElementById('pullOutsList');
+            if (!outs || outs.length === 0) { el.innerHTML = '<p style="text-align:center;color:var(--gray);padding:20px;font-size:13px;">No active pull-outs</p>'; return; }
+            el.innerHTML = outs.map(o => `<div style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="window.location='/pages/pull-outs.html'">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    ${o.student_photo ? `<img src="${o.student_photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">` : `<div style="width:32px;height:32px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:13px;">${(o.student_name || '?')[0]}</div>`}
+                    <div>
+                        <strong>${o.student_name}</strong>
+                        <span style="font-size:12px;color:var(--gray);margin-left:8px;">${o.section_name || ''}</span>
+                    </div>
+                </div>
+                <div style="font-size:12px;color:var(--gray);margin-top:2px;">${o.picked_up_by} · ${app.formatDateTime(o.time_pulled)}</div>
+            </div>`).join('');
+        }
+
+        function renderPendingExcuses(excuses) {
+            const el = document.getElementById('excusesList');
+            if (!excuses || excuses.length === 0) { el.innerHTML = '<p style="text-align:center;color:var(--gray);padding:20px;font-size:13px;">No pending excuses</p>'; return; }
+            el.innerHTML = excuses.map(e => `<div style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="window.location='/pages/excuses.html'">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    ${e.student_photo ? `<img src="${e.student_photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">` : `<div style="width:32px;height:32px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:13px;">${(e.student_name || '?')[0]}</div>`}
+                    <div>
+                        <strong>${e.student_name}</strong>
+                        <span class="badge ${e.type === 'Absent' ? 'badge-out' : 'badge-warning'}">${e.type}</span>
+                        <span style="font-size:12px;color:var(--gray);margin-left:8px;">${e.section_name || ''}</span>
+                    </div>
+                </div>
+                <div style="font-size:12px;color:var(--gray);margin-top:2px;">${e.reason.substring(0, 60)}${e.reason.length > 60 ? '...' : ''}</div>
+            </div>`).join('');
+        }
+
+        function renderStatCards(d) {
+            const g = d.gate || {};
+            document.getElementById('stat-cards').innerHTML = `
+                <div class="card stat-card primary" onclick="window.location='/pages/students.html'"><div class="stat-icon">🎓</div><div class="stat-value">${d.total_students}</div><div class="stat-label">Total Students</div></div>
+                <div class="card stat-card info" onclick="window.location='/pages/users.html'"><div class="stat-icon">👨‍🏫</div><div class="stat-value">${d.total_teachers !== undefined ? d.total_teachers : 'N/A'}</div><div class="stat-label">Teachers</div></div>
+                <div class="card stat-card info" onclick="window.location='/pages/users.html'"><div class="stat-icon">👥</div><div class="stat-value">${d.total_staff}</div><div class="stat-label">Staff</div></div>
+                <div class="card stat-card success" onclick="window.location='/pages/parents.html'"><div class="stat-icon">👪</div><div class="stat-value">${d.total_parents}</div><div class="stat-label">Parents</div></div>
+                <div class="card stat-card success" onclick="window.location='/pages/attendance-records.html?status=Present'"><div class="stat-icon">✅</div><div class="stat-value">${d.present_today}</div><div class="stat-label">Present Today</div></div>
+                <div class="card stat-card warning" onclick="window.location='/pages/attendance-records.html?status=Late'"><div class="stat-icon">⏰</div><div class="stat-value">${d.late_today}</div><div class="stat-label">Late Today</div></div>
+                <div class="card stat-card danger" onclick="window.location='/pages/attendance-records.html?status=Absent'"><div class="stat-icon">❌</div><div class="stat-value">${d.absent_today}</div><div class="stat-label">Absent Today</div></div>
+                <div class="card stat-card success" onclick="window.location='/pages/scan-logs.html?scan_type=ENTRY'"><div class="stat-icon">🏫</div><div class="stat-value">${g.students_inside}</div><div class="stat-label">Inside Campus</div></div>
+                <div class="card stat-card secondary" onclick="window.location='/pages/scan-logs.html?scan_type=EXIT'"><div class="stat-icon">🏠</div><div class="stat-value">${g.students_outside}</div><div class="stat-label">Outside Campus</div></div>
+                <div class="card stat-card danger" onclick="window.location='/pages/scan-logs.html'"><div class="stat-icon">⏳</div><div class="stat-value">${g.students_not_yet_entered || 0}</div><div class="stat-label">Not Yet Entered</div></div>
+                <div class="card stat-card info" onclick="window.location='/pages/scan-logs.html?scan_type=ENTRY'"><div class="stat-icon">📥</div><div class="stat-value">${g.today_entries}</div><div class="stat-label">Entries Today</div></div>
+                <div class="card stat-card warning" onclick="window.location='/pages/scan-logs.html?scan_type=EXIT'"><div class="stat-icon">📤</div><div class="stat-value">${g.today_exits}</div><div class="stat-label">Exits Today</div></div>
+            `;
+        }
+
+        function renderLiveFeed(scans) {
+            const el = document.getElementById('liveFeed');
+            if (!scans || scans.length === 0) { el.innerHTML = '<p style="text-align:center;color:var(--gray);padding:20px;">No scans yet today.</p>'; return; }
+            el.innerHTML = scans.map(s => {
+                const dot = s.scan_type === 'ENTRY' ? 'entry' : 'exit';
+                const label = s.scan_type === 'ENTRY' ? `ENTRY ${s.exit_type ? '- ' + s.exit_type : ''}` : `EXIT ${s.exit_type ? '- ' + s.exit_type : ''}`;
+                const photo = s.photo
+                    ? `<img src="${s.photo}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+                    : `<div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:11px;flex-shrink:0;">${(s.student_name || '?')[0]}</div>`;
+                return `<div class="feed-item" onclick="window.location='/pages/students.html'" title="View student details">
+                    ${photo}
+                    <div class="feed-dot ${dot}"></div>
+                    <div style="flex:1;min-width:0;">
+                        <strong>${s.student_name}</strong>
+                        <span style="font-size:12px;color:var(--gray);margin-left:8px;">${s.grade_level || ''} ${s.section_name || ''}</span>
+                    </div>
+                    <span style="font-size:12px;font-weight:600;color:${s.scan_type === 'ENTRY' ? 'var(--success)' : 'var(--info)'};">${label}</span>
+                    <span style="font-size:12px;color:var(--gray);white-space:nowrap;">${app.formatTime(s.scan_time)}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function renderInsideOutside(gate) {
+            const inside = gate.inside_list || [];
+            const outside = gate.outside_list || [];
+
+            document.getElementById('insideList').innerHTML = inside.length === 0
+                ? '<p style="text-align:center;color:var(--gray);padding:20px;">No students inside</p>'
+                : inside.map(s => `<div style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;" onclick="window.location='/pages/students.html'">
+                    ${studentPhotoHtml(s)}
+                    <div style="flex:1;">
+                        ${studentLink(s.student_id, s.student_name)}
+                        <span style="font-size:12px;color:var(--gray);margin-left:4px;">${s.grade_level || ''} ${s.section_name || ''}</span>
+                    </div>
+                    <span style="font-size:12px;color:var(--gray);white-space:nowrap;">${app.formatTime(s.first_entry_time || s.last_entry)}</span>
+                </div>`).join('');
+
+            document.getElementById('outsideList').innerHTML = outside.length === 0
+                ? '<p style="text-align:center;color:var(--gray);padding:20px;">No students outside</p>'
+                : outside.map(s => `<div style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;" onclick="window.location='/pages/students.html'">
+                    ${studentPhotoHtml(s)}
+                    <div style="flex:1;">
+                        ${studentLink(s.student_id, s.student_name)}
+                        <span style="font-size:12px;color:var(--gray);margin-left:4px;">${s.grade_level || ''} ${s.section_name || ''}</span>
+                    </div>
+                    <span style="font-size:12px;color:var(--gray);white-space:nowrap;">${app.formatTime(s.last_exit)}</span>
+                </div>`).join('');
+        }
+
+        function renderExitTypes(types) {
+            const el = document.getElementById('exitTypeChart');
+            if (!types || types.length === 0) { el.innerHTML = '<p style="text-align:center;color:var(--gray);padding:20px;">No exits today.</p>'; return; }
+            el.innerHTML = `<div class="exit-chart">${types.map(t => {
+                const icons = {'Dismissal':'🚌','Parent Pickup':'🚗','Medical Emergency':'🚑','Lunch Pass':'🍽️','Official School Activity':'📋','Teacher Request':'👨‍🏫','Authorized Leave':'📝'};
+                return `<div class="exit-chart-item" onclick="window.location='/pages/scan-logs.html'">
+                    <div style="font-size:28px;">${icons[t.exit_type] || '🚪'}</div>
+                    <div class="exit-chart-value">${t.count}</div>
+                    <div style="font-size:12px;color:var(--gray);">${t.exit_type}</div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        function renderTrend(trend) {
+            const el = document.getElementById('trendChart');
+            if (!trend || trend.length === 0) { el.innerHTML = '<p style="text-align:center;color:var(--gray);padding:20px;">No data.</p>'; return; }
+            const max = Math.max(...trend.map(d => Math.max(parseInt(d.present), parseInt(d.late), parseInt(d.absent), 1)));
+            el.innerHTML = `<div class="trend-bar">${trend.map(d => {
+                const pct = (v) => Math.max(4, (v / max) * 100);
+                const label = d.attendance_date ? d.attendance_date.slice(5) : '';
+                return `<div class="trend-col">
+                    <div class="trend-stack">
+                        <div class="trend-seg absent" style="height:${pct(parseInt(d.absent))}px;"></div>
+                        <div class="trend-seg late" style="height:${pct(parseInt(d.late))}px;"></div>
+                        <div class="trend-seg present" style="height:${pct(parseInt(d.present))}px;"></div>
+                    </div>
+                    <div class="trend-label">${label}</div>
+                    <div style="font-size:10px;color:var(--gray);">${d.present}/${d.late}/${d.absent}</div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        function renderAlerts(alerts) {
+            const el = document.getElementById('alertsSection');
+            if (!alerts) { el.innerHTML = '<p>No alerts.</p>'; return; }
+
+            let html = '<div class="dash-grid">';
+
+            // Medical Emergency
+            const medical = alerts.medical_emergency || [];
+            html += `<div><h4 style="margin-bottom:8px;color:#dc2626;">🚑 Medical Emergency (${medical.length})</h4>`;
+            if (medical.length === 0) html += '<p style="color:var(--gray);font-size:13px;">None today</p>';
+            else medical.forEach(s => {
+                html += `<div class="alert-item danger" onclick="window.location='/pages/scan-logs.html'" style="display:flex;align-items:center;gap:8px;">
+                    ${studentPhotoHtml(s)}
+                    <div>
+                        ${studentLink(s.student_id, s.student_name)}
+                        <span style="font-size:12px;color:var(--gray);display:block;">${s.section || ''} · ${app.formatTime(s.scan_time)}</span>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+
+            // Late Students
+            const late = alerts.late_students || [];
+            html += `<div><h4 style="margin-bottom:8px;color:#f59e0b;">⏰ Late Today (${late.length})</h4>`;
+            if (late.length === 0) html += '<p style="color:var(--gray);font-size:13px;">None today</p>';
+            else late.forEach(s => {
+                html += `<div class="alert-item warning" onclick="window.location='/pages/attendance-records.html'" style="display:flex;align-items:center;gap:8px;">
+                    ${studentPhotoHtml(s)}
+                    <div>
+                        ${studentLink(s.student_id, s.student_name)}
+                        <span style="font-size:12px;color:var(--gray);display:block;">${s.section || ''} · ${s.remarks || ''}</span>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+
+            // Not Entered
+            const notIn = alerts.not_entered || [];
+            html += `<div><h4 style="margin-bottom:8px;color:#64748b;">⏳ Not Yet Entered (${notIn.length})</h4>`;
+            if (notIn.length === 0) html += '<p style="color:var(--gray);font-size:13px;">All students entered today</p>';
+            else html += '<div class="scroll-list" style="max-height:200px;">' + notIn.slice(0, 15).map(s => {
+                return `<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="window.location='/pages/students.html'">
+                    ${studentPhotoHtml(s, 24)}
+                    <div>
+                        ${studentLink(s.student_id, s.student_name)}
+                        <span style="color:var(--gray);margin-left:4px;">${s.section || ''}</span>
+                    </div>
+                </div>`;
+            }).join('') + (notIn.length > 15 ? `<p style="font-size:12px;color:var(--gray);margin-top:8px;">+${notIn.length - 15} more</p>` : '') + '</div>';
+            html += '</div>';
+
+            html += '</div>';
+            el.innerHTML = html;
+        }
+
+        function renderEmailStats(stats, failed) {
+            const el = document.getElementById('emailStats');
+            const sent = stats ? (parseInt(stats.Sent) || 0) : 0;
+            const failedCount = stats ? (parseInt(stats.Failed) || 0) : 0;
+            const pending = stats ? (parseInt(stats.Pending) || 0) : 0;
+            const total = sent + failedCount + pending;
+            const rate = total > 0 ? ((sent / total) * 100).toFixed(0) : 0;
+
+            let html = `<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:12px 0;">
+                <div style="text-align:center;min-width:100px;">
+                    <div style="font-size:36px;font-weight:700;color:var(--success);">${sent}</div>
+                    <div style="font-size:13px;color:var(--gray);">Sent ✓</div>
+                </div>
+                <div style="text-align:center;min-width:100px;">
+                    <div style="font-size:36px;font-weight:700;color:var(--danger);">${failedCount}</div>
+                    <div style="font-size:13px;color:var(--gray);">Failed ✗</div>
+                </div>
+                <div style="text-align:center;min-width:100px;">
+                    <div style="font-size:36px;font-weight:700;color:var(--warning);">${pending}</div>
+                    <div style="font-size:13px;color:var(--gray);">Pending ⏳</div>
+                </div>
+                <div style="flex:1;min-width:150px;">
+                    <div style="font-size:13px;color:var(--gray);margin-bottom:4px;">Success Rate: ${rate}%</div>
+                    <div style="height:20px;background:#e5e7eb;border-radius:10px;overflow:hidden;">
+                        <div style="height:100%;width:${rate}%;background:${rate > 80 ? 'var(--success)' : rate > 50 ? 'var(--warning)' : 'var(--danger)'};border-radius:10px;transition:width 0.5s;"></div>
+                    </div>
+                </div>
+            </div>`;
+
+            if (failedCount > 0) {
+                html += `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-top:8px;">
+                    <h4 style="color:#dc2626;margin-bottom:8px;">🚨 Failed Notifications (${failedCount})</h4>
+                    <div class="table-responsive"><table class="table" style="font-size:13px;"><thead><tr><th>Student</th><th>Parent Email</th><th>Type</th><th>Subject</th></tr></thead><tbody>`;
+                failed.forEach(e => {
+                    html += `<tr style="cursor:pointer;" onclick="window.location='/pages/email-logs.html'">
+                        <td><a class="student-link" href="/pages/students.html">${e.student_name}</a></td>
+                        <td>${e.parent_email}</td>
+                        <td>${app.statusBadge(e.notification_type || 'N/A')}</td>
+                        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.subject || '-'}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></div></div>`;
+            }
+
+            el.innerHTML = html;
+        }
+
+        function renderSectionRank(rankings) {
+            const el = document.getElementById('sectionRank');
+            if (!rankings || rankings.length === 0) { el.innerHTML = '<p style="text-align:center;color:var(--gray);padding:20px;">No sections.</p>'; return; }
+            const maxPresent = Math.max(...rankings.map(r => parseInt(r.present_count)), 1);
+            el.innerHTML = `<div class="table-responsive"><table class="table"><thead><tr><th>#</th><th>Section</th><th>Students</th><th>Present Today</th><th>Rate</th></tr></thead><tbody>
+                ${rankings.map((r, i) => {
+                    const rate = r.total_students > 0 ? ((r.present_count / r.total_students) * 100).toFixed(0) : 0;
+                    const barW = (r.present_count / maxPresent) * 100;
+                    return `<tr class="section-rank" onclick="window.location='/pages/sections.html'">
+                        <td>${i + 1}</td>
+                        <td><strong>${r.grade_level || ''} ${r.section_name}</strong></td>
+                        <td>${r.total_students}</td>
+                        <td>${r.present_count}</td>
+                        <td style="position:relative;">${rate}% <div style="position:absolute;bottom:4px;left:60px;height:6px;width:100px;background:#e5e7eb;border-radius:3px;"><div style="height:100%;background:var(--success);border-radius:3px;width:${barW}%;transition:width 0.5s;"></div></div></td>
+                    </tr>`;
+                }).join('')}
+            </tbody></table></div>`;
+        }
+
+        // Real-time updates
+        let lastScanTime = null;
+        try {
+            const bc = new BroadcastChannel('gate_attendance');
+            bc.onmessage = (e) => { if (e.data && e.data.type === 'scan') loadDashboard(); };
+        } catch (_) {}
+
+        async function checkForUpdates() {
+            if (role !== 'Admin') return;
+            try {
+                const res = await api.get('/scan-logs/check');
+                const data = res.data;
+                if (!data) return;
+                if (lastScanTime && data.last_time !== lastScanTime) loadDashboard();
+                lastScanTime = data.last_time;
+            } catch (_) {}
+        }
+
+        loadDashboard();
+        if (role === 'Admin') setInterval(checkForUpdates, 3000);
+    </script>
+</body>
+</html>
+

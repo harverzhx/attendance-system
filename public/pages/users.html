@@ -1,0 +1,304 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Users - Gate Attendance System</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .role-badge { display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600; }
+    .role-Admin { background:#fef2f2;color:#dc2626; }
+    .role-Teacher { background:#eff6ff;color:#2563eb; }
+    .role-Adviser { background:#f0fdf4;color:#16a34a; }
+    .role-Staff { background:#fef3c7;color:#d97706; }
+    .role-Viewer { background:#f5f3ff;color:#7c3aed; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="flex-between mb-20">
+    <div class="filter-bar">
+        <div class="form-group"><input type="search" class="form-control" id="searchUser" placeholder="Search name, username, email..." oninput="loadUsers()"></div>
+        <div class="form-group"><select class="form-select" id="filterRole" onchange="loadUsers()"><option value="">All Roles</option><option value="Admin">Admin</option><option value="Teacher">Teacher</option><option value="Adviser">Adviser</option><option value="Staff">Staff</option><option value="Viewer">Viewer</option></select></div>
+        <button class="btn btn-primary" onclick="showAddUserModal()">+ Add User</button>
+    </div>
+</div>
+
+<div class="card">
+    <div id="users-table"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<div id="userModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; padding:30px; width:500px; max-width:90%; max-height:90vh; overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+            <h3 id="modalTitle" style="margin:0">Add User</h3>
+            <button type="button" onclick="closeModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;padding:0;line-height:1">&times;</button>
+        </div>
+        <div id="form-alert" style="display:none"></div>
+        <form id="userForm" novalidate>
+            <div class="form-row">
+                <div class="form-group"><label>First Name</label><input type="text" class="form-control" id="u_first_name" onblur="toProperCase(this)"></div>
+                <div class="form-group"><label>Middle Name</label><input type="text" class="form-control" id="u_middle_name" onblur="toProperCase(this)"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Last Name</label><input type="text" class="form-control" id="u_last_name" onblur="toProperCase(this)"></div>
+                <div class="form-group"><label>Employee ID</label><input type="text" class="form-control" id="u_employee_id" placeholder="e.g. EMP-001"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Contact Number</label><input type="text" class="form-control" id="u_contact" placeholder="e.g. +63 9123456789" oninput="validateContactNumber(this)" onblur="formatContactNumber(this)"></div>
+                <div class="form-group"><label>Email</label><input type="email" class="form-control" id="u_email" onblur="validateEmailField(this)"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Username</label><input type="text" class="form-control" id="u_username"></div>
+                <div class="form-group"><label>Role</label><select class="form-select" id="u_role" onchange="toggleSpecializationField()"><option value="Admin">Admin</option><option value="Teacher">Teacher</option><option value="Adviser">Adviser</option><option value="Staff">Staff</option><option value="Viewer">Viewer</option></select></div>
+            </div>
+            <div id="u_specializationGroup" class="form-group" style="display:none;">
+                <label>BSED Major / Specialization</label>
+                <select class="form-select" id="u_specialization">
+                    <option value="">Select major...</option>
+                    <option value="English">English</option>
+                    <option value="Filipino">Filipino</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Science">Science</option>
+                    <option value="General Science">General Science</option>
+                    <option value="Biology">Biology</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Social Studies">Social Studies</option>
+                    <option value="History">History</option>
+                    <option value="Economics">Economics</option>
+                    <option value="Geography">Geography</option>
+                    <option value="Values Education">Values Education</option>
+                    <option value="Religious Education">Religious Education</option>
+                    <option value="SPED">Special Education (SPED)</option>
+                    <option value="TLE">TLE</option>
+                    <option value="Home Economics">Home Economics</option>
+                    <option value="Industrial Arts">Industrial Arts</option>
+                    <option value="ICT">ICT</option>
+                    <option value="MAPEH">MAPEH</option>
+                    <option value="Physical Education">Physical Education</option>
+                    <option value="Music Education">Music Education</option>
+                    <option value="Arts Education">Arts Education</option>
+                    <option value="Health Education">Health Education</option>
+                    <option value="Early Childhood Education">Early Childhood Education</option>
+                    <option value="Reading Education">Reading Education</option>
+                    <option value="Guidance and Counseling">Guidance and Counseling</option>
+                    <option value="Library Science">Library and Information Science</option>
+                    <option value="Agricultural Education">Agricultural Education</option>
+                    <option value="Fisheries Education">Fisheries Education</option>
+                    <option value="Entrepreneurship Education">Entrepreneurship Education</option>
+                    <option value="Environmental Education">Environmental Education</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Password</label><input type="password" class="form-control" id="u_password"></div>
+            <div class="form-group"><label>Status</label><select class="form-select" id="u_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+            <input type="hidden" id="u_id">
+            <div class="flex gap-10 mt-10">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+function toProperCase(el) {
+    el.value = el.value.replace(/\w\S*/g, function(txt) {
+        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    });
+}
+
+function validateContactNumber(el) {
+    const val = el.value.trim();
+    if (!val) { el.style.borderColor = ''; return true; }
+    const cleaned = val.replace(/[\s\-\(\)]/g, '');
+    const isValid = /^(?:\+63|0)?9\d{9}$/.test(cleaned);
+    el.style.borderColor = isValid ? '' : 'red';
+    return isValid;
+}
+
+function formatContactNumber(el) {
+    let val = el.value.replace(/[^\d+]/g, '');
+    if (!val.startsWith('+') && val.length > 0 && val.startsWith('63')) {
+        val = '+' + val;
+    }
+    el.value = val;
+}
+
+function validateEmailField(el) {
+    const val = el.value.trim();
+    if (!val) return true;
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!re.test(val)) { el.style.borderColor = 'red'; return false; }
+    el.style.borderColor = '';
+    return true;
+}
+
+async function loadUsers() {
+    try {
+        const result = await api.getUsers();
+        const users = result.data || [];
+        const search = document.getElementById('searchUser').value.toLowerCase();
+        const roleFilter = document.getElementById('filterRole').value;
+
+        const filtered = users.filter(u => {
+            if (roleFilter && u.role_name !== roleFilter) return false;
+            if (search && !(u.first_name + ' ' + u.last_name + u.username + u.email + (u.specialization || '')).toLowerCase().includes(search)) return false;
+            return true;
+        });
+
+        let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th>Name</th><th>Employee ID</th><th>Username</th><th>Email</th><th>Contact</th><th>Specialization</th><th>Role</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody>`;
+
+        if (filtered.length === 0) {
+            html += '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray);">No users found.</td></tr>';
+        }
+
+        filtered.forEach(u => {
+            html += `<tr>
+                <td><strong>${u.first_name} ${u.last_name}</strong></td>
+                <td><code style="background:#f0f0f0;padding:1px 6px;border-radius:4px;font-size:13px;">${u.employee_id || '-'}</code></td>
+                <td><code style="background:#f0f0f0;padding:1px 6px;border-radius:4px;font-size:13px;">${u.username}</code></td>
+                <td>${u.email}</td>
+                <td>${u.contact_number || '-'}</td>
+                <td style="font-size:12px;">${u.specialization ? `<span style="background:#f0fdf4;color:#16a34a;padding:1px 8px;border-radius:10px;">${u.specialization}</span>` : '-'}</td>
+                <td><span class="role-badge role-${u.role_name}">${u.role_name}</span></td>
+                <td>${app.statusBadge(u.status)}</td>
+                <td class="flex gap-10">
+                    <button class="btn btn-sm btn-primary" onclick="editUser(${u.user_id})">Edit</button>
+                    ${u.status === 'Active'
+                        ? `<button class="btn btn-sm btn-warning" onclick="toggleStatus(${u.user_id},'Inactive')">Deactivate</button>`
+                        : `<button class="btn btn-sm btn-success" onclick="toggleStatus(${u.user_id},'Active')">Activate</button>`}
+                    <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.user_id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        if (filtered.length > 0) {
+            html += '<div style="font-size:12px;color:var(--gray);padding:8px 16px;text-align:right;">Showing ' + filtered.length + ' of ' + users.length + ' users</div>';
+        }
+        document.getElementById('users-table').innerHTML = html;
+    } catch (err) {
+        document.getElementById('users-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function toggleStatus(id, status) {
+    if (!await app.confirmAction(`Set user to ${status}?`)) return;
+    try {
+        if (status === 'Active') await api.activateUser(id);
+        else await api.deactivateUser(id);
+        app.showAlert(`User ${status.toLowerCase()} successfully`);
+        loadUsers();
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+async function deleteUser(id) {
+    if (!await app.confirmAction('Delete this user?')) return;
+    try { await api.deleteUser(id); app.showAlert('User deleted'); loadUsers(); }
+    catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+function toggleSpecializationField() {
+    const role = document.getElementById('u_role').value;
+    const sg = document.getElementById('u_specializationGroup');
+    sg.style.display = (role === 'Teacher' || role === 'Adviser') ? 'block' : 'none';
+}
+
+async function editUser(id) {
+    try {
+        const result = await api.getUser(id);
+        const u = result.data;
+        document.getElementById('modalTitle').textContent = 'Edit User';
+        document.getElementById('u_id').value = u.user_id;
+        document.getElementById('u_first_name').value = u.first_name;
+        document.getElementById('u_middle_name').value = u.middle_name || '';
+        document.getElementById('u_last_name').value = u.last_name;
+        document.getElementById('u_employee_id').value = u.employee_id || '';
+        document.getElementById('u_contact').value = u.contact_number || '';
+        document.getElementById('u_email').value = u.email;
+        document.getElementById('u_username').value = u.username;
+        document.getElementById('u_role').value = u.role_name;
+        document.getElementById('u_specialization').value = u.specialization || '';
+        document.getElementById('u_status').value = u.status;
+        document.getElementById('u_password').required = false;
+        toggleSpecializationField();
+        showModal();
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+function showAddUserModal() {
+    document.getElementById('modalTitle').textContent = 'Add User';
+    document.getElementById('userForm').reset();
+    document.getElementById('u_id').value = '';
+    document.getElementById('u_password').required = true;
+    document.getElementById('u_specializationGroup').style.display = 'none';
+    document.getElementById('form-alert').style.display = 'none';
+    showModal();
+}
+
+function showModal() {
+    document.getElementById('form-alert').style.display = 'none';
+    document.getElementById('userModal').style.display = 'flex';
+}
+function closeModal() { document.getElementById('userModal').style.display = 'none'; }
+
+document.getElementById('userForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    document.getElementById('form-alert').style.display = 'none';
+
+    toProperCase(document.getElementById('u_first_name'));
+    toProperCase(document.getElementById('u_middle_name'));
+    toProperCase(document.getElementById('u_last_name'));
+
+    const firstNameEl = document.getElementById('u_first_name');
+    const lastNameEl = document.getElementById('u_last_name');
+    const usernameEl = document.getElementById('u_username');
+    const emailEl = document.getElementById('u_email');
+    const contactEl = document.getElementById('u_contact');
+
+    if (!firstNameEl.value.trim()) { app.showFormAlert('First name is required.', 'danger'); firstNameEl.focus(); return; }
+    if (!lastNameEl.value.trim()) { app.showFormAlert('Last name is required.', 'danger'); lastNameEl.focus(); return; }
+    if (!usernameEl.value.trim()) { app.showFormAlert('Username is required.', 'danger'); usernameEl.focus(); return; }
+    if (!emailEl.value.trim()) { app.showFormAlert('Email is required.', 'danger'); emailEl.focus(); return; }
+    if (!validateEmailField(emailEl)) { app.showFormAlert('Please enter a valid email address.', 'danger'); emailEl.focus(); return; }
+    if (contactEl.value.trim() && !validateContactNumber(contactEl)) {
+        app.showFormAlert('Please enter a valid Philippine contact number.', 'danger');
+        return;
+    }
+
+    const id = document.getElementById('u_id').value;
+    const data = {
+        employee_id: document.getElementById('u_employee_id').value || null,
+        first_name: firstNameEl.value,
+        middle_name: document.getElementById('u_middle_name').value,
+        last_name: lastNameEl.value,
+        email: emailEl.value,
+        contact_number: contactEl.value,
+        username: usernameEl.value,
+        role: document.getElementById('u_role').value,
+        specialization: document.getElementById('u_specialization').value || null,
+        status: document.getElementById('u_status').value,
+    };
+    const pw = document.getElementById('u_password').value;
+    if (pw) data.password = pw;
+
+    try {
+        if (id) { await api.updateUser(id, data); app.showFormAlert('User updated!', 'success'); }
+        else { await api.createUser(data); app.showFormAlert('User created!', 'success'); }
+        setTimeout(() => { closeModal(); loadUsers(); }, 1500);
+    } catch (err) { app.showFormAlert(err.message, 'danger'); }
+});
+
+loadUsers();
+</script>
+</body></html>
+

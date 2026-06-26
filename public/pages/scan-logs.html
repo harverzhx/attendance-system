@@ -1,0 +1,181 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan Logs</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .sl-photo { width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle; }
+    .sl-photo-pl { width:32px;height:32px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:12px;vertical-align:middle; }
+    .exit-badge { display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600; }
+    .exit-Dismissal { background:#f0fdf4;color:#16a34a; }
+    .exit-Parent\ Pickup { background:#fef3c7;color:#d97706; }
+    .exit-Medical\ Emergency { background:#fef2f2;color:#dc2626; }
+    .exit-Lunch\ Pass { background:#eff6ff;color:#2563eb; }
+    .exit-Teacher\ Request { background:#f5f3ff;color:#7c3aed; }
+    .exit-Official\ School\ Activity { background:#f0f9ff;color:#0284c7; }
+    .exit-Authorized\ Leave { background:#f8fafc;color:#64748b; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="filter-bar">
+    <div class="form-group"><label>Date</label><input type="date" class="form-control" id="filterDate"></div>
+    <div class="form-group"><label>Scan Type</label><select class="form-select" id="filterScanType"><option value="">All</option><option value="ENTRY">ENTRY</option><option value="EXIT">EXIT</option></select></div>
+    <div class="form-group"><label>Exit Type</label><select class="form-select" id="filterExitType"><option value="">All</option><option value="Teacher Request">Teacher Request</option><option value="Official School Activity">Official School Activity</option><option value="Parent Pickup">Parent Pickup</option><option value="Medical Emergency">Medical Emergency</option><option value="Authorized Leave">Authorized Leave</option><option value="Lunch Pass">Lunch Pass</option><option value="Dismissal">Dismissal</option></select></div>
+    <div class="form-group"><label>Search</label><input type="text" class="form-control" id="filterSearch" placeholder="Name or student #..." style="min-width:140px;"></div>
+    <button class="btn btn-primary" onclick="loadScanLogs()">Filter</button>
+    <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+</div>
+
+<div class="grid-4" id="summary-cards" style="margin-bottom:20px;"></div>
+
+<div class="card">
+    <div class="flex-between">
+        <div class="card-header">Scan Logs</div>
+        <div><small id="record-count">0 records</small></div>
+    </div>
+    <div id="scan-logs-table"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+document.getElementById('filterDate').value = app.localDate();
+
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('scan_type')) document.getElementById('filterScanType').value = urlParams.get('scan_type');
+if (urlParams.get('exit_type')) document.getElementById('filterExitType').value = urlParams.get('exit_type');
+
+async function loadScanLogs() {
+    const container = document.getElementById('scan-logs-table');
+    container.innerHTML = '<div class="loading">Loading...</div>';
+
+    try {
+        const filters = {
+            date: document.getElementById('filterDate').value,
+            scan_type: document.getElementById('filterScanType').value,
+            exit_type: document.getElementById('filterExitType').value,
+        };
+        const search = document.getElementById('filterSearch').value.trim();
+        if (search && !isNaN(search)) filters.student_id = search;
+        if (search && isNaN(search)) filters.search = search;
+
+        const [logsResult, summaryResult] = await Promise.all([
+            api.getScanLogs(filters),
+            api.getScanLogSummary()
+        ]);
+
+        const logs = logsResult.data || [];
+        const summary = summaryResult.data || {};
+
+        renderSummary(summary);
+        renderTable(logs);
+        document.getElementById('record-count').textContent = logs.length + ' records';
+    } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+function renderSummary(summary) {
+    document.getElementById('summary-cards').innerHTML = `
+        <div class="card stat-card success"><div class="stat-value">${summary.students_inside || 0}</div><div class="stat-label">Inside Campus</div></div>
+        <div class="card stat-card secondary"><div class="stat-value">${summary.students_outside || 0}</div><div class="stat-label">Outside Campus</div></div>
+        <div class="card stat-card" style="background:#f0f9ff;"><div class="stat-value">${summary.students_not_yet_entered || 0}</div><div class="stat-label">Not Yet Entered</div></div>
+        <div class="card stat-card info"><div class="stat-value">${summary.today_entries || 0}</div><div class="stat-label">Entries</div></div>
+        <div class="card stat-card warning"><div class="stat-value">${summary.today_exits || 0}</div><div class="stat-label">Exits</div></div>
+    `;
+}
+
+function exitBadge(type) {
+    if (!type) return '-';
+    const safe = type.replace(/\s+/g, '\\ ');
+    return `<span class="exit-badge exit-${safe}">${type}</span>`;
+}
+
+function renderTable(logs) {
+    const container = document.getElementById('scan-logs-table');
+    if (!logs || logs.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:var(--gray);padding:40px;">No scan logs found.</p>';
+        return;
+    }
+
+    let html = `<div class="table-responsive"><table class="table"><thead><tr>
+        <th style="width:38px;"></th>
+        <th>Student</th><th>Student #</th><th>Section</th><th>Type</th><th>Exit Type</th><th>Time</th>
+    </tr></thead><tbody>`;
+
+    logs.forEach(r => {
+        const photo = r.student_photo
+            ? `<img src="${r.student_photo}" class="sl-photo">`
+            : `<div class="sl-photo-pl">${(r.student_name || '?')[0]}</div>`;
+        const typeBadge = r.scan_type === 'ENTRY' ? 'badge-success' : 'badge-info';
+        html += `<tr>
+            <td>${photo}</td>
+            <td><strong>${r.student_name || '-'}</strong></td>
+            <td style="color:var(--gray);">${r.student_number || '-'}</td>
+            <td style="font-size:13px;">${r.grade_level || ''} ${r.section_name || ''}</td>
+            <td><span class="badge ${typeBadge}">${r.scan_type}</span></td>
+            <td>${exitBadge(r.exit_type)}</td>
+            <td style="white-space:nowrap;color:var(--gray);">${app.formatTime(r.scan_time)}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function resetFilters() {
+    document.getElementById('filterDate').value = app.localDate();
+    document.getElementById('filterScanType').value = '';
+    document.getElementById('filterExitType').value = '';
+    document.getElementById('filterSearch').value = '';
+    loadScanLogs();
+}
+
+// Real-time auto-refresh
+let lastScanTime = null;
+let watchTimer = null;
+
+try {
+    const bc = new BroadcastChannel('gate_attendance');
+    bc.onmessage = (e) => {
+        if (e.data && e.data.type === 'scan') loadScanLogs();
+    };
+} catch (_) {}
+
+async function checkForUpdates() {
+    try {
+        const res = await api.get('/scan-logs/check');
+        const data = res.data;
+        if (!data) return;
+        if (lastScanTime && data.last_time !== lastScanTime) {
+            const filters = {
+                date: document.getElementById('filterDate').value,
+                scan_type: document.getElementById('filterScanType').value,
+                exit_type: document.getElementById('filterExitType').value,
+            };
+            const search = document.getElementById('filterSearch').value.trim();
+            if (search && !isNaN(search)) filters.student_id = search;
+            if (search && isNaN(search)) filters.search = search;
+
+            const [logsResult, summaryResult] = await Promise.all([
+                api.getScanLogs(filters),
+                api.getScanLogSummary()
+            ]);
+            renderSummary(summaryResult.data || {});
+            renderTable(logsResult.data || []);
+        }
+        lastScanTime = data.last_time;
+    } catch (_) {}
+}
+
+loadScanLogs();
+watchTimer = setInterval(checkForUpdates, 3000);
+</script>
+</body></html>
+

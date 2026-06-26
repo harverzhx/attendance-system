@@ -1,0 +1,303 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance Records</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .att-photo { width:36px;height:36px;border-radius:50%;object-fit:cover;vertical-align:middle; }
+    .att-photo-placeholder { width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:13px;vertical-align:middle; }
+    .subject-tag { display:inline-block;padding:2px 8px;background:#eff6ff;color:#2563eb;border-radius:12px;font-size:11px;font-weight:600; }
+    .summary-bar { display:flex;gap:20px;padding:12px 16px;background:#f8fafc;border-radius:8px;margin-bottom:12px;font-size:14px; }
+    .summary-item { text-align:center;min-width:80px; }
+    .summary-value { font-size:22px;font-weight:700; }
+    .summary-label { font-size:12px;color:var(--gray); }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="filter-bar" id="staffFilter" style="display:none;">
+    <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="dateFrom" onchange="loadStaffAttendance()"></div>
+    <div class="form-group"><label>To Date</label><input type="date" class="form-control" id="dateTo" onchange="loadStaffAttendance()"></div>
+    <button class="btn btn-primary" onclick="loadStaffAttendance()">View Attendance</button>
+</div>
+
+<div class="filter-bar" id="standardFilter">
+    <div class="form-group"><label>Date</label><input type="date" class="form-control" id="filterDate" onchange="loadAttendance()"></div>
+    <div class="form-group"><label>Section</label><select class="form-select" id="filterSection" onchange="loadAttendance()"><option value="">All Sections</option></select></div>
+    <div class="form-group"><label>Status</label><select class="form-select" id="filterStatus" onchange="loadAttendance()"><option value="">All</option><option value="Present">Present</option><option value="Late">Late</option><option value="Absent">Absent</option></select></div>
+    <div class="form-group"><label>Subject</label><select class="form-select" id="filterSubject" onchange="loadAttendance()"><option value="">All Subjects</option></select></div>
+    <div class="form-group"><label>Search</label><input type="search" class="form-control" id="filterSearch" placeholder="Name, #, remarks..." oninput="debounceSearch()" style="min-width:140px;"></div>
+</div>
+
+<div class="card">
+    <div id="summaryBar" class="summary-bar"></div>
+    <div id="attendance-table"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+const role = auth.getRole();
+const isAdmin = role === 'Admin';
+
+document.getElementById('filterDate').value = app.localDate();
+
+// Role-based UI setup
+if (role === 'Staff') {
+    document.getElementById('staffFilter').style.display = '';
+    document.getElementById('standardFilter').style.display = 'none';
+    document.getElementById('dateFrom').value = app.localDate();
+    document.getElementById('dateTo').value = app.localDate();
+}
+
+const urlParams = new URLSearchParams(window.location.search);
+const urlStatus = urlParams.get('status');
+if (urlStatus) document.getElementById('filterStatus').value = urlStatus;
+
+let searchTimer;
+let _mySectionIds = [];
+
+function debounceSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadAttendance, 300);
+}
+
+async function loadSections() {
+    const sel = document.getElementById('filterSection');
+    try {
+        let sections;
+        if (isAdmin) {
+            const r = await api.getSections();
+            sections = r.data || [];
+        } else {
+            const tsR = await api.get('/teacher-sections');
+            _mySectionIds = (tsR.data || []).map(s => s.section_id);
+            sections = (tsR.data || []).filter(s => s.section_id);
+            if (sections.length === 0) {
+                sel.innerHTML = '<option value="">No sections assigned</option>';
+                return;
+            }
+        }
+        sel.innerHTML = '<option value="">All Sections</option>';
+        sections.forEach(s => {
+            sel.innerHTML += `<option value="${s.section_id}">${s.grade_level || ''} ${s.section_name}</option>`;
+        });
+    } catch (_) {}
+}
+
+async function loadSubjects() {
+    const sel = document.getElementById('filterSubject');
+    try {
+        if (!isAdmin) {
+            const me = await api.getMe();
+            const userData = me.data || me;
+            const r = await api.get(`/teacher-subjects?teacher_id=${userData.user_id}`);
+            if (r.data && r.data.length > 0) {
+                r.data.forEach(ts => {
+                    sel.innerHTML += `<option value="${ts.subject_id}">${ts.subject_code} - ${ts.subject_name}</option>`;
+                });
+                return;
+            }
+
+            if (userData.specialization) {
+                const mappedNames = app.getMajorSubjects(userData.specialization);
+                if (mappedNames.length > 0) {
+                    const allSubs = await api.get('/subjects');
+                    const filtered = (allSubs.data || []).filter(s => mappedNames.includes(s.subject_name));
+                    if (filtered.length > 0) {
+                        filtered.forEach(s => {
+                            sel.innerHTML += `<option value="${s.subject_id}">${s.subject_code} - ${s.subject_name}</option>`;
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+        const allSubs = await api.get('/subjects');
+        (allSubs.data || []).forEach(s => {
+            sel.innerHTML += `<option value="${s.subject_id}">${s.subject_code} - ${s.subject_name}</option>`;
+        });
+    } catch (_) {}
+}
+
+function parseSubject(remarks) {
+    if (!remarks) return null;
+    const m = remarks.match(/\[Subject:\s*(\d+)\]/);
+    return m ? parseInt(m[1]) : null;
+}
+
+function getSubjectName(id) {
+    const sel = document.getElementById('filterSubject');
+    for (const opt of sel.options) {
+        if (parseInt(opt.value) === id) return opt.text;
+    }
+    return null;
+}
+
+async function loadAttendance() {
+    try {
+        const sectionVal = document.getElementById('filterSection').value;
+        const filters = {
+            date: document.getElementById('filterDate').value,
+            section_id: sectionVal || null,
+            status: document.getElementById('filterStatus').value || null,
+            search: document.getElementById('filterSearch').value || null,
+        };
+        const r = await api.getAttendance(filters);
+        let records = r.data || [];
+
+        // Teacher/Adviser: filter by assigned sections
+        if (!isAdmin && _mySectionIds.length > 0) {
+            records = records.filter(row => _mySectionIds.includes(row.section_id));
+        }
+
+        // Filter by subject client-side
+        const subjectFilter = parseInt(document.getElementById('filterSubject').value);
+        const filtered = subjectFilter
+            ? records.filter(r => parseSubject(r.remarks) === subjectFilter)
+            : records;
+
+        // Summary
+        const total = filtered.length;
+        const present = filtered.filter(r => r.status === 'Present').length;
+        const late = filtered.filter(r => r.status === 'Late').length;
+        const absent = filtered.filter(r => r.status === 'Absent').length;
+        document.getElementById('summaryBar').innerHTML = `
+            <div class="summary-item"><div class="summary-value" style="color:var(--primary)">${total}</div><div class="summary-label">Total</div></div>
+            <div class="summary-item"><div class="summary-value" style="color:var(--success)">${present}</div><div class="summary-label">Present</div></div>
+            <div class="summary-item"><div class="summary-value" style="color:var(--warning)">${late}</div><div class="summary-label">Late</div></div>
+            <div class="summary-item"><div class="summary-value" style="color:var(--danger)">${absent}</div><div class="summary-label">Absent</div></div>
+        `;
+
+        let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th style="width:44px;"></th>
+            <th>Student Name</th><th>Student #</th><th>Section</th><th>Subject</th><th>Time In</th><th>Time Out</th><th>Status</th><th>Remarks</th>
+            ${isAdmin ? '<th style="width:140px">Actions</th>' : ''}
+        </tr></thead><tbody>`;
+
+        if (filtered.length === 0) {
+            html += `<tr><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;padding:40px;color:var(--gray);">No records found</td></tr>`;
+        }
+
+        filtered.forEach(r => {
+            const photo = r.student_photo
+                ? `<img src="${r.student_photo}" class="att-photo">`
+                : `<div class="att-photo-placeholder">${(r.student_name || '?')[0]}</div>`;
+            const subjectId = parseSubject(r.remarks);
+            const subjectName = subjectId ? getSubjectName(subjectId) : null;
+            const subjectTag = subjectName ? `<span class="subject-tag">${subjectName}</span>` : '-';
+            let cleanRemarks = (r.remarks || '').replace(/\[Subject:\s*\d+\]\s*/g, '').trim() || '-';
+
+            html += `<tr>
+                <td>${photo}</td>
+                <td><strong>${r.student_name}</strong></td>
+                <td>${r.student_number || '-'}</td>
+                <td>${r.grade_level || ''} ${r.section_name || ''}</td>
+                <td>${subjectTag}</td>
+                <td>${app.formatTime(r.time_in)}</td>
+                <td>${app.formatTime(r.time_out)}</td>
+                <td>${app.statusBadge(r.status)}</td>
+                <td style="font-size:13px;color:var(--gray);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${cleanRemarks}">${cleanRemarks}</td>
+                ${isAdmin ? `<td style="white-space:nowrap">
+                    <button class="btn btn-sm btn-primary" onclick="sendNotification(${r.attendance_id})">Notify</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteRecord(${r.attendance_id})">Delete</button>
+                </td>` : ''}
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        if (filtered.length > 0) {
+            html += '<div style="font-size:12px;color:var(--gray);padding:8px 16px;text-align:right;">Showing ' + filtered.length + ' of ' + records.length + ' records</div>';
+        }
+        document.getElementById('attendance-table').innerHTML = html;
+    } catch (err) {
+        document.getElementById('attendance-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function loadStaffAttendance() {
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    if (!dateFrom || !dateTo) { app.showAlert('Select date range', 'danger'); return; }
+
+    try {
+        const r = await api.get(`/attendance?date_from=${dateFrom}&date_to=${dateTo}`);
+        let records = r.data || [];
+
+        const container = document.getElementById('attendance-table');
+        const summaryBar = document.getElementById('summaryBar');
+
+        if (records.length === 0) {
+            summaryBar.innerHTML = '';
+            container.innerHTML = '<p style="text-align:center;color:var(--gray);padding:40px;">No attendance records found.</p>';
+            return;
+        }
+
+        // Summary
+        const total = records.length;
+        const present = records.filter(r => r.status === 'Present').length;
+        const late = records.filter(r => r.status === 'Late').length;
+        const absent = records.filter(r => r.status === 'Absent').length;
+        summaryBar.innerHTML = `
+            <div class="summary-item"><div class="summary-value" style="color:var(--primary)">${total}</div><div class="summary-label">Total</div></div>
+            <div class="summary-item"><div class="summary-value" style="color:var(--success)">${present}</div><div class="summary-label">Present</div></div>
+            <div class="summary-item"><div class="summary-value" style="color:var(--warning)">${late}</div><div class="summary-label">Late</div></div>
+            <div class="summary-item"><div class="summary-value" style="color:var(--danger)">${absent}</div><div class="summary-label">Absent</div></div>
+        `;
+
+        let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th style="width:44px;"></th>
+            <th>Student Name</th><th>Student #</th><th>Section</th><th>Date</th><th>Time In</th><th>Time Out</th><th>Status</th>
+        </tr></thead><tbody>`;
+
+        records.forEach(r => {
+            const photo = r.student_photo
+                ? `<img src="${r.student_photo}" class="att-photo">`
+                : `<div class="att-photo-placeholder">${(r.student_name || '?')[0]}</div>`;
+            html += `<tr>
+                <td>${photo}</td>
+                <td><strong>${r.student_name}</strong></td>
+                <td>${r.student_number || '-'}</td>
+                <td>${r.grade_level || ''} ${r.section_name || ''}</td>
+                <td>${r.attendance_date || '-'}</td>
+                <td>${app.formatTime(r.time_in)}</td>
+                <td>${app.formatTime(r.time_out)}</td>
+                <td>${app.statusBadge(r.status)}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        html += '<div style="font-size:12px;color:var(--gray);padding:8px 16px;text-align:right;">' + total + ' records</div>';
+        container.innerHTML = html;
+    } catch (err) {
+        document.getElementById('attendance-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function deleteRecord(id) {
+    if (!await app.confirmAction('Delete this attendance record?')) return;
+    try { await api.deleteAttendance(id); app.showAlert('Record deleted'); loadAttendance(); }
+    catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+async function sendNotification(id) {
+    if (!await app.confirmAction('Send attendance notification to parent/guardian?')) return;
+    try { const r = await api.sendAttendanceNotification(id); app.showAlert(r.message || 'Sent'); }
+    catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+if (role === 'Staff') {
+    loadStaffAttendance();
+} else {
+    loadSections().then(() => {
+        loadSubjects();
+        loadAttendance();
+    });
+}
+</script>
+</body></html>
+

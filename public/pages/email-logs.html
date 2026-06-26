@@ -1,0 +1,102 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Logs</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .email-row:hover { background:#f8fafc; }
+    .summary-cards { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+    .summary-cards .card { flex:1; min-width:100px; text-align:center; padding:16px; border-radius:10px; border:1px solid var(--border); }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="filter-bar">
+    <div class="form-group"><input type="search" class="form-control" id="searchEmail" placeholder="Search student, email..." oninput="loadEmailLogs()"></div>
+    <div class="form-group"><label>Status</label><select class="form-select" id="filterStatus" onchange="loadEmailLogs()"><option value="">All</option><option value="Sent">Sent</option><option value="Failed">Failed</option><option value="Pending">Pending</option></select></div>
+    <div class="form-group"><label>Date</label><input type="date" class="form-control" id="filterDate" onchange="loadEmailLogs()"></div>
+</div>
+
+<div class="card">
+    <div id="summaryCards" class="summary-cards"></div>
+    <div id="email-logs-table"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+async function loadEmailLogs() {
+    try {
+        const result = await api.getEmailLogs();
+        const logs = result.data || [];
+        const search = document.getElementById('searchEmail').value.toLowerCase();
+        const statusFilter = document.getElementById('filterStatus').value;
+        const dateFilter = document.getElementById('filterDate').value;
+
+        const filtered = logs.filter(l => {
+            if (statusFilter && l.send_status !== statusFilter) return false;
+            if (dateFilter && l.created_at && !l.created_at.startsWith(dateFilter)) return false;
+            if (search && !(l.student_name + l.parent_email + (l.subject || '')).toLowerCase().includes(search)) return false;
+            return true;
+        });
+
+        // Summary
+        const sent = filtered.filter(l => l.send_status === 'Sent').length;
+        const failed = filtered.filter(l => l.send_status === 'Failed').length;
+        const pending = filtered.filter(l => l.send_status === 'Pending').length;
+        const total = filtered.length;
+        const rate = total > 0 ? ((sent / total) * 100).toFixed(0) : 0;
+
+        document.getElementById('summaryCards').innerHTML = `
+            <div class="card" style="border-left:4px solid var(--success);"><div style="font-size:24px;font-weight:700;color:var(--success)">${sent}</div><div style="font-size:12px;color:var(--gray);">Sent ✓</div></div>
+            <div class="card" style="border-left:4px solid var(--danger);"><div style="font-size:24px;font-weight:700;color:var(--danger)">${failed}</div><div style="font-size:12px;color:var(--gray);">Failed ✗</div></div>
+            <div class="card" style="border-left:4px solid var(--warning);"><div style="font-size:24px;font-weight:700;color:var(--warning)">${pending}</div><div style="font-size:12px;color:var(--gray);">Pending ⏳</div></div>
+            <div class="card" style="border-left:4px solid var(--primary);"><div style="font-size:24px;font-weight:700;color:var(--primary)">${rate}%</div><div style="font-size:12px;color:var(--gray);">Success Rate</div></div>
+        `;
+
+        let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th>Date</th><th>Time</th><th>Student</th><th>Parent Email</th><th>Type</th><th>Subject</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody>`;
+
+        if (filtered.length === 0) {
+            html += '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray);">No email logs found.</td></tr>';
+        }
+
+        filtered.forEach(l => {
+            const typeBadge = l.notification_type === 'Arrival' || l.notification_type === 'Entry' ? 'badge-success'
+                : l.notification_type === 'Late' ? 'badge-warning'
+                : l.notification_type === 'Dismissal' ? 'badge-info'
+                : 'badge-secondary';
+            html += `<tr class="email-row">
+                <td>${l.created_at ? app.formatDate(l.created_at) : '-'}</td>
+                <td>${l.sent_at ? app.formatTime(l.sent_at) : (l.send_status === 'Pending' ? '⏳' : '--')}</td>
+                <td><strong>${l.student_name}</strong></td>
+                <td><code style="font-size:12px;">${l.parent_email}</code></td>
+                <td><span class="badge ${typeBadge}">${l.notification_type || 'N/A'}</span></td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.subject || ''}">${l.subject || '-'}</td>
+                <td>${app.statusBadge(l.send_status)}</td>
+                <td>${l.send_status === 'Failed' ? `<button class="btn btn-sm btn-primary" onclick="resend(${l.email_log_id})">↻ Resend</button>` : '-'}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        document.getElementById('email-logs-table').innerHTML = html;
+    } catch (err) {
+        document.getElementById('email-logs-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function resend(id) {
+    try { await api.resendEmail(id); app.showAlert('Email resent'); loadEmailLogs(); }
+    catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+loadEmailLogs();
+</script>
+</body></html>
+

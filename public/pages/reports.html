@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - Gate Attendance System</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .report-stats { display:flex; gap:16px; padding:16px; background:#f8fafc; border-radius:8px; margin-bottom:16px; flex-wrap:wrap; }
+        .stat-card { flex:1; min-width:120px; text-align:center; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+        .stat-value { font-size:28px; font-weight:700; line-height:1.2; }
+        .stat-label { font-size:12px; color:var(--gray); margin-top:4px; }
+        .stat-card.present .stat-value { color:var(--success); }
+        .stat-card.late .stat-value { color:#f59e0b; }
+        .stat-card.absent .stat-value { color:var(--danger); }
+        .stat-card.total .stat-value { color:var(--primary); }
+
+        .clickable-name { cursor:pointer; color:var(--primary); font-weight:600; }
+        .clickable-name:hover { text-decoration:underline; }
+
+        /* History modal */
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center; }
+        .modal-box { background:#fff; border-radius:12px; padding:24px; max-width:700px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+        .modal-close { float:right; background:none; border:none; font-size:24px; cursor:pointer; color:var(--gray); }
+        .modal-close:hover { color:#000; }
+
+        @media print {
+            .sidebar, .topbar, .filter-bar, .btn { display:none !important; }
+            .main-content { margin-left:0 !important; padding:20px !important; }
+            .card { box-shadow:none !important; border:1px solid #ddd !important; }
+            .report-stats { break-inside:avoid; }
+            .table th { background:#f5f5f5 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+            .clickable-name { cursor:default !important; text-decoration:none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main-content">
+        <div class="topbar" id="topbar"></div>
+        <div id="alert-container"></div>
+
+        <div class="filter-bar">
+            <div class="form-group"><label>Report Type</label><select class="form-select" id="reportType" onchange="toggleFilters()">
+                <option value="daily">Daily Attendance</option>
+                <option value="section">Per Section Report</option>
+                <option value="late">Late Students</option>
+                <option value="absent">Absent Students</option>
+            </select></div>
+            <div class="form-group"><label>Date From</label><input type="date" class="form-control" id="reportDateFrom" onchange="generateReport()"></div>
+            <div class="form-group" id="dateToGroup"><label>Date To</label><input type="date" class="form-control" id="reportDateTo" onchange="generateReport()"></div>
+            <div class="form-group" id="sectionGroup" style="display:none"><label>Section</label><select class="form-select" id="reportSection" onchange="generateReport()"><option value="">All Sections</option></select></div>
+            <div class="form-group" style="align-self:flex-end;"><button class="btn btn-primary" onclick="exportCSV()">Export CSV</button></div>
+        </div>
+
+        <div id="summaryTop" class="report-stats" style="display:none;"></div>
+
+        <div class="card">
+            <div id="report-result"><div class="loading">Select report type to generate...</div></div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js?v=1"></script>
+    <script>
+        auth.requireAuth();
+        const _role = auth.getRole();
+        const _isAdmin = _role === 'Admin';
+
+        const today = app.localDate();
+        document.getElementById('reportDateFrom').value = today;
+        document.getElementById('reportDateTo').value = today;
+
+        let _mySectionIds = [];
+        let _lastData = [];
+        let _lastType = '';
+
+        async function loadSections() {
+            const sel = document.getElementById('reportSection');
+            try {
+                let sections;
+                if (_isAdmin) {
+                    const r = await api.getSections();
+                    sections = r.data || [];
+                } else {
+                    const tsR = await api.get('/teacher-sections');
+                    _mySectionIds = (tsR.data || []).map(s => s.section_id);
+                    sections = (tsR.data || []).filter(s => s.section_id);
+                    if (sections.length === 0) {
+                        sel.innerHTML = '<option value="">No sections assigned</option>';
+                        return;
+                    }
+                }
+                sel.innerHTML = '<option value="">All Sections</option>';
+                sections.forEach(s => {
+                    sel.innerHTML += `<option value="${s.section_id}">${s.grade_level || ''} ${s.section_name}</option>`;
+                });
+            } catch (_) {}
+        }
+
+        function toggleFilters() {
+            const type = document.getElementById('reportType').value;
+            document.getElementById('dateToGroup').style.display = type === 'daily' ? 'none' : 'block';
+            document.getElementById('sectionGroup').style.display = type === 'section' ? 'block' : 'none';
+            generateReport();
+        }
+
+        function getDateParams() {
+            return {
+                date_from: document.getElementById('reportDateFrom').value,
+                date_to: typeNeedsRange() ? document.getElementById('reportDateTo').value : document.getElementById('reportDateFrom').value
+            };
+        }
+
+        function typeNeedsRange() {
+            const t = document.getElementById('reportType').value;
+            return t === 'section' || t === 'late' || t === 'absent';
+        }
+
+        async function generateReport() {
+            const type = document.getElementById('reportType').value;
+            const container = document.getElementById('report-result');
+            container.innerHTML = '<div class="loading">Generating report...</div>';
+
+            try {
+                let result;
+                const sectionId = document.getElementById('reportSection').value;
+                const { date_from, date_to } = getDateParams();
+
+                if (type === 'daily') result = await api.getDailyReport(date_from);
+                else if (type === 'section') result = await api.getSectionReport(sectionId || 0, date_from, date_to);
+                else if (type === 'late') result = await api.getLateReport(date_from, date_to);
+                else if (type === 'absent') result = await api.getAbsentReport(date_from, date_to);
+
+                let data = result.data || [];
+                if (!_isAdmin && _mySectionIds.length > 0) {
+                    data = data.filter(row => _mySectionIds.includes(row.section_id));
+                }
+                _lastData = data;
+                _lastType = type;
+                renderReportTable(data, type);
+            } catch (err) {
+                container.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+        }
+
+        function renderSummary(data, type) {
+            const top = document.getElementById('summaryTop');
+            if (!data || data.length === 0) { top.style.display = 'none'; return ''; }
+
+            if (type === 'section') {
+                const totalStudents = data.length;
+                const totalPresent = data.reduce((s, r) => s + (parseInt(r.present_count) || 0), 0);
+                const totalLate = data.reduce((s, r) => s + (parseInt(r.late_count) || 0), 0);
+                const totalAbsent = data.reduce((s, r) => s + (parseInt(r.absent_count) || 0), 0);
+                const totalDays = totalPresent + totalLate + totalAbsent;
+                top.style.display = 'flex';
+                top.innerHTML = `
+                    <div class="stat-card total"><div class="stat-value">${totalStudents}</div><div class="stat-label">Students</div></div>
+                    <div class="stat-card present"><div class="stat-value">${totalPresent}</div><div class="stat-label">Total Present</div></div>
+                    <div class="stat-card late"><div class="stat-value">${totalLate}</div><div class="stat-label">Total Late</div></div>
+                    <div class="stat-card absent"><div class="stat-value">${totalAbsent}</div><div class="stat-label">Total Absent</div></div>
+                `;
+                return '';
+            }
+
+            const total = data.length;
+            const present = data.filter(r => r.status === 'Present').length;
+            const late = data.filter(r => r.status === 'Late').length;
+            const absent = data.filter(r => r.status === 'Absent').length;
+            const pct = v => total > 0 ? (v / total * 100).toFixed(1) + '%' : '0%';
+            top.style.display = 'flex';
+            top.innerHTML = `
+                <div class="stat-card total"><div class="stat-value">${total}</div><div class="stat-label">Total</div></div>
+                <div class="stat-card present"><div class="stat-value">${present}</div><div class="stat-label">Present (${pct(present)})</div></div>
+                <div class="stat-card late"><div class="stat-value">${late}</div><div class="stat-label">Late (${pct(late)})</div></div>
+                <div class="stat-card absent"><div class="stat-value">${absent}</div><div class="stat-label">Absent (${pct(absent)})</div></div>
+            `;
+            return '';
+        }
+
+        function renderReportTable(data, type) {
+            const container = document.getElementById('report-result');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:var(--gray); padding:40px;">No records found.</p>';
+                return;
+            }
+
+            let headers = [], fields = [], title = '';
+            if (type === 'daily') {
+                title = 'Daily Attendance';
+                headers = ['Photo', 'Student #', 'Name', 'Section', 'Time In', 'Time Out', 'Status'];
+                fields = ['photo', 'student_number', 'student_name', 'section_name', 'time_in', 'time_out', 'status'];
+            } else if (type === 'section') {
+                title = 'Section Report';
+                headers = ['Student #', 'Name', 'Present', 'Late', 'Absent'];
+                fields = ['student_number', 'student_name', 'present_count', 'late_count', 'absent_count'];
+            } else if (type === 'late') {
+                title = 'Late Students';
+                headers = ['Photo', 'Student #', 'Name', 'Section', 'Times Late', 'Dates'];
+                fields = ['photo', 'student_number', 'student_name', 'section_name', 'late_count', 'late_dates'];
+            } else if (type === 'absent') {
+                title = 'Absent Students';
+                headers = ['Photo', 'Student #', 'Name', 'Section', 'Times Absent', 'Dates'];
+                fields = ['photo', 'student_number', 'student_name', 'section_name', 'absent_count', 'absent_dates'];
+            }
+
+            renderSummary(data, type);
+            let html = `<div class="flex-between mb-10"><div class="card-header">${title}</div><small>${data.length} records</small></div>`;
+            html += `<div class="table-responsive"><table class="table"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+
+            data.forEach(row => {
+                const studentId = row.student_id;
+                html += `<tr>${fields.map(f => {
+                    if (f === 'photo') {
+                        const src = row.student_photo || row.photo;
+                        if (src) return `<td><img src="${src}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;"></td>`;
+                        return `<td><div style="width:32px;height:32px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:13px;">${(row.student_name || '?')[0]}</div></td>`;
+                    }
+                    if (f === 'student_name') return `<td><span class="clickable-name" onclick="showStudentHistory(${studentId}, '${row.student_name.replace(/'/g, "\\'")}')">${row.student_name}</span></td>`;
+                    if (f === 'status') return `<td>${app.statusBadge(row[f])}</td>`;
+                    if (f === 'time_in' || f === 'time_out') return `<td>${app.formatTime(row[f])}</td>`;
+                    return `<td>${row[f] || '-'}</td>`;
+                }).join('')}</tr>`;
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        async function showStudentHistory(studentId, studentName) {
+            try {
+                const r = await api.get(`/attendance?student_id=${studentId}&limit=50`);
+                const records = r.data || [];
+                let html = `<button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                    <h3 style="margin-top:0;">${studentName}</h3>
+                    <p style="color:var(--gray);font-size:13px;">Last 50 attendance records</p>`;
+                if (records.length === 0) {
+                    html += '<p style="color:var(--gray);">No attendance records found.</p>';
+                } else {
+                    html += `<div class="table-responsive"><table class="table"><thead><tr><th>Date</th><th>Time In</th><th>Time Out</th><th>Status</th></tr></thead><tbody>`;
+                    records.forEach(r => {
+                        html += `<tr><td>${r.date || '-'}</td><td>${app.formatTime(r.time_in)}</td><td>${app.formatTime(r.time_out)}</td><td>${app.statusBadge(r.status)}</td></tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                }
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.innerHTML = `<div class="modal-box">${html}</div>`;
+                overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+                document.body.appendChild(overlay);
+            } catch (err) {
+                app.showAlert('Failed to load history: ' + err.message, 'danger');
+            }
+        }
+
+        function exportCSV() {
+            const data = _lastData;
+            const type = _lastType;
+            if (!data || data.length === 0) { app.showAlert('No data to export', 'warning'); return; }
+
+            let headers = [], fields = [];
+            if (type === 'daily') { headers = ['Student #','Name','Section','Time In','Time Out','Status']; fields = ['student_number','student_name','section_name','time_in','time_out','status']; }
+            else if (type === 'section') { headers = ['Student #','Name','Present','Late','Absent']; fields = ['student_number','student_name','present_count','late_count','absent_count']; }
+            else if (type === 'late') { headers = ['Student #','Name','Section','Times Late','Dates']; fields = ['student_number','student_name','section_name','late_count','late_dates']; }
+            else if (type === 'absent') { headers = ['Student #','Name','Section','Times Absent','Dates']; fields = ['student_number','student_name','section_name','absent_count','absent_dates']; }
+
+            let csv = headers.join(',') + '\n';
+            data.forEach(row => {
+                csv += fields.map(f => {
+                    let val = row[f] || '';
+                    if (f === 'time_in' || f === 'time_out') val = app.formatTime(row[f]) || '';
+                    val = String(val).replace(/"/g, '""');
+                    return `"${val}"`;
+                }).join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${type}-report-${app.localDate()}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+            app.showAlert('CSV exported successfully!', 'success');
+        }
+
+        loadSections();
+        toggleFilters();
+    </script>
+</body>
+</html>

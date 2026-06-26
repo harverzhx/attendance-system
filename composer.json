@@ -1,0 +1,20 @@
+{
+    "name": "school/gate-attendance",
+    "description": "Automated School Gate Attendance Tracking and Parent Email Notification System",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "mikecao/flight": "^2.0",
+        "phpmailer/phpmailer": "^6.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "api/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "mikecao/flight": true
+        }
+    }
+}

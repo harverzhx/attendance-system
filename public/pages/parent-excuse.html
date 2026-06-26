@@ -1,0 +1,133 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submit Excuse Slip</title><link rel="stylesheet" href="/css/style.css">
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="card" style="max-width:600px;margin:20px auto;">
+    <div class="card-header">Submit Excuse Slip</div>
+    <form id="excuseForm" onsubmit="return submitExcuse(event)" style="padding:20px;">
+        <div class="form-group">
+            <label>Child</label>
+            <select class="form-select" id="studentSelect" required><option value="">Select your child</option></select>
+        </div>
+        <div class="form-group">
+            <label>Date of Absence/Lateness</label>
+            <input type="date" class="form-control" id="excuseDate" required>
+        </div>
+        <div class="form-group">
+            <label>Type</label>
+            <select class="form-select" id="excuseType" required>
+                <option value="">Select type</option>
+                <option value="Absent">Absent</option>
+                <option value="Late">Late</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Reason</label>
+            <textarea class="form-control" id="excuseReason" rows="4" placeholder="Explain the reason for absence/lateness..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Submit Excuse Slip</button>
+    </form>
+</div>
+
+<div class="card" style="max-width:600px;margin:20px auto;">
+    <div class="card-header">My Submitted Excuses</div>
+    <div id="myExcuses"><p style="text-align:center;padding:20px;color:var(--gray);">Loading...</p></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+document.getElementById('excuseDate').value = app.localDate();
+
+async function loadChildren() {
+    try {
+        const r = await api.get('/parent/student');
+        const kids = r.data || [];
+        const sel = document.getElementById('studentSelect');
+        sel.innerHTML = '<option value="">Select your child</option>';
+        kids.forEach(k => {
+            sel.innerHTML += `<option value="${k.student_id}">${k.first_name || ''} ${k.last_name || ''} (${k.student_number || ''})</option>`;
+        });
+        loadMyExcuses();
+    } catch (err) {
+        document.getElementById('studentSelect').innerHTML = '<option value="">Error loading children</option>';
+    }
+}
+
+async function loadMyExcuses() {
+    try {
+        const r = await api.get('/parent/student');
+        const kids = r.data || [];
+        const ids = kids.map(k => k.student_id);
+        let allExcuses = [];
+        for (const sid of ids) {
+            const er = await api.get('/excuses?student_id=' + sid);
+            allExcuses = allExcuses.concat(er.data || []);
+        }
+        allExcuses.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        const container = document.getElementById('myExcuses');
+        if (allExcuses.length === 0) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:var(--gray);">No excuses submitted yet.</p>';
+            return;
+        }
+        let html = '';
+        allExcuses.forEach(e => {
+            const cls = e.status === 'Approved' ? 'badge-success' : e.status === 'Rejected' ? 'badge-danger' : 'badge-warning';
+            html += `<div style="padding:12px;border-bottom:1px solid var(--border);font-size:14px;">
+                <div style="display:flex;justify-content:space-between;">
+                    <span><strong>${e.student_name}</strong> — ${e.type} on ${e.excuse_date}</span>
+                    <span class="badge ${cls}">${e.status}</span>
+                </div>
+                <p style="margin:4px 0 0;color:var(--gray);font-size:13px;">${e.reason}</p>
+                ${e.rejection_reason ? `<p style="margin:2px 0 0;color:#dc2626;font-size:12px;">Rejected: ${e.rejection_reason}</p>` : ''}
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch (_) {
+        document.getElementById('myExcuses').innerHTML = '<p style="text-align:center;padding:20px;color:var(--gray);">Could not load excuses.</p>';
+    }
+}
+
+async function submitExcuse(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    try {
+        const studentId = document.getElementById('studentSelect').value;
+        const excuseDate = document.getElementById('excuseDate').value;
+        const type = document.getElementById('excuseType').value;
+        const reason = document.getElementById('excuseReason').value;
+
+        if (!studentId || !excuseDate || !type || !reason) {
+            app.showAlert('Please fill in all fields', 'warning');
+            btn.disabled = false; btn.textContent = 'Submit Excuse Slip';
+            return;
+        }
+
+        await api.post('/excuses', { student_id: studentId, excuse_date: excuseDate, type, reason });
+        app.showAlert('Excuse slip submitted successfully. Waiting for teacher approval.', 'success');
+        document.getElementById('excuseReason').value = '';
+        loadMyExcuses();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Submit Excuse Slip';
+}
+
+loadChildren();
+</script>
+</body></html>
+

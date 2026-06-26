@@ -1,0 +1,510 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance Scanner</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .scanner-result { text-align:center; padding:24px; border-radius:12px; background:#f8fafc; margin-top:12px; }
+    .scanner-result .photo { width:80px; height:80px; border-radius:50%; object-fit:cover; margin:0 auto 12px; display:block; }
+    .scanner-result .photo-pl { width:80px; height:80px; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700; color:#64748b; margin:0 auto 12px; }
+    .scanner-result .student-name { font-size:20px; font-weight:700; }
+    .scanner-result .student-section { font-size:14px; color:var(--gray); margin-top:4px; }
+    .scanner-result .scan-time { font-size:13px; color:var(--gray); margin-top:8px; }
+    .scanner-result .status-display { font-size:14px; font-weight:600; margin-top:6px; padding:4px 12px; display:inline-block; border-radius:12px; }
+    .scanner-result .status-display.Present { background:#f0fdf4; color:#16a34a; }
+    .scanner-result .status-display.Late { background:#fef3c7; color:#d97706; }
+    .scanner-result.bg-success { background:#f0fdf4;border:2px solid #bbf7d0; }
+    .scanner-result.bg-warning { background:#fef3c7;border:2px solid #fde68a; }
+    .scanner-result.bg-info { background:#eff6ff;border:2px solid #bfdbfe; }
+    .scanner-result.bg-danger { background:#fef2f2;border:2px solid #fecaca; }
+    .scan-input-large { font-size:28px; padding:16px; text-align:center; letter-spacing:4px; font-family:monospace; }
+    #scanHistory .hist-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border); }
+    .hist-photo { width:32px; height:32px; border-radius:50%; object-fit:cover; }
+    .hist-photo-pl { width:32px; height:32px; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:#64748b; }
+    @keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+    .toast-notification { animation:slideIn 0.3s ease; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+    <div class="card" style="max-width:500px; margin:0 auto; width:100%;">
+        <div class="card-header">Scan Barcode
+            <button class="btn btn-sm btn-primary" onclick="openCameraScanner()" style="float:right;white-space:nowrap;">📷 Camera</button>
+        </div>
+        <div class="form-group" style="padding:12px;">
+            <input type="text" class="form-control scan-input-large" id="scanInput" placeholder="Scan or enter barcode..." autofocus>
+            <p style="margin:6px 0 0;font-size:12px;color:var(--gray);text-align:center;">USB scanner: point and scan → auto-submits. Or type barcode manually + press Enter.</p>
+        </div>
+        <div id="scanResult"></div>
+        <div class="card-header" style="margin-top:20px;">Recent Scans</div>
+        <div id="scanHistory"></div>
+    </div>
+</div>
+
+<!-- Camera Scanner Overlay -->
+<div id="cameraOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:3000;flex-direction:column;align-items:center;justify-content:center;padding:10px;">
+    <div style="background:#fff;border-radius:12px;padding:16px;width:100%;max-width:500px;text-align:center;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="margin:0;">📷 Scan Barcode</h3>
+            <button onclick="closeCameraScanner()" class="close-camera-btn" style="background:none;border:none;cursor:pointer;color:var(--gray);">&times;</button>
+        </div>
+        <div id="cameraReader" style="width:100%;min-height:250px;background:#000;border-radius:8px;overflow:hidden;"></div>
+        <p id="cameraStatus" style="margin:8px 0 0;font-size:13px;color:var(--gray);">Point camera at student barcode</p>
+    </div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script src="/js/realtime.js"></script>
+<script>
+auth.requireAuth();
+
+let cameraStream = null;
+let scanInterval = null;
+
+const scanInput = document.getElementById('scanInput');
+let lastScans = JSON.parse(localStorage.getItem('lastScans') || '[]');
+let pendingBarcode = null;
+let lastScanTimestamps = new Map();
+const DUPLICATE_WINDOW = 3000;
+let refocusInterval = null;
+
+function showToast(message, type = 'success') {
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    const colors = { success: '#16a34a', error: '#dc2626', warning: '#d97706', info: '#2563eb' };
+    toast.style.background = colors[type] || colors.info;
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 3500);
+}
+
+function isDuplicate(code) {
+    const now = Date.now();
+    if (lastScanTimestamps.has(code) && (now - lastScanTimestamps.get(code)) < DUPLICATE_WINDOW) {
+        return true;
+    }
+    lastScanTimestamps.set(code, now);
+    for (const [key, time] of lastScanTimestamps) {
+        if (now - time > DUPLICATE_WINDOW * 2) lastScanTimestamps.delete(key);
+    }
+    return false;
+}
+
+function ensureScanFocus() {
+    if (document.querySelector('.confirm-overlay') || document.getElementById('cameraOverlay')?.style.display === 'flex') return;
+    if (document.activeElement !== scanInput && !scanInput.disabled) scanInput.focus();
+}
+
+const EXIT_TYPES = [
+    { value: 'Teacher Request', label: 'Teacher Request' },
+    { value: 'Official School Activity', label: 'Official School Activity' },
+    { value: 'Parent Pickup', label: 'Parent Pickup' },
+    { value: 'Medical Emergency', label: 'Medical Emergency' },
+    { value: 'Authorized Leave', label: 'Authorized Leave' },
+    { value: 'Lunch Pass', label: 'Lunch Pass' },
+    { value: 'Dismissal', label: 'Dismissal (Going Home)' },
+];
+
+function photoHtml(url, name, size = 80) {
+    if (url) return `<img src="${url}" class="photo" style="width:${size}px;height:${size}px;">`;
+    return `<div class="photo-pl" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px;">${(name || '?')[0]}</div>`;
+}
+
+function showExitTypeModal(barcode) {
+    pendingBarcode = barcode;
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.id = 'exitTypeModal';
+    overlay.innerHTML = `
+        <div class="confirm-dialog" role="dialog" aria-modal="true">
+            <div class="confirm-dialog__icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#2563eb"/>
+                </svg>
+            </div>
+            <p class="confirm-dialog__message" style="margin-bottom:16px;">Select Exit Type</p>
+            <div style="margin-bottom:20px;">
+                <select id="exitTypeSelect" class="form-control" style="width:100%;padding:10px;font-size:14px;border:1px solid var(--border);border-radius:6px;">
+                    <option value="">-- Select Exit Type --</option>
+                    ${EXIT_TYPES.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}
+                </select>
+            </div>
+            <div class="confirm-dialog__actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('exitTypeModal').remove(); pendingBarcode=null; scanInput.disabled=false; scanInput.focus();">Cancel</button>
+                <button class="btn btn-primary confirm-ok" onclick="submitExitScan()">Confirm</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('exitTypeSelect').focus();
+}
+
+async function submitExitScan() {
+    const exitType = document.getElementById('exitTypeSelect').value;
+    if (!exitType) { app.showAlert('Please select an exit type', 'danger'); return; }
+    if (exitType === 'Parent Pickup') {
+        document.getElementById('exitTypeModal').remove();
+        showPullOutForm(pendingBarcode, exitType);
+        return;
+    }
+    document.getElementById('exitTypeModal').remove();
+    await doScan(pendingBarcode, exitType);
+    pendingBarcode = null;
+}
+
+function showPullOutForm(barcode, exitType) {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.id = 'pullOutModal';
+    overlay.innerHTML = `
+        <div class="confirm-dialog" role="dialog" aria-modal="true" style="max-width:450px;">
+            <h3 style="margin-bottom:16px;">Pull-Out Form (Parent Pickup)</h3>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Picked Up By *</label>
+                <input type="text" id="poName" class="form-control" placeholder="Full name of person picking up" required>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Relationship</label>
+                <select id="poRelation" class="form-control" style="padding:10px;border:1px solid var(--border);border-radius:6px;">
+                    <option value="Parent">Parent</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Relative">Relative</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Purpose</label>
+                <textarea id="poPurpose" class="form-control" rows="2" placeholder="Reason for pull-out"></textarea>
+            </div>
+            <div class="confirm-dialog__actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('pullOutModal').remove(); pendingBarcode=null; scanInput.disabled=false; scanInput.focus();">Cancel</button>
+                <button class="btn btn-primary confirm-ok" onclick="submitPullOut()">Confirm Pull-Out</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('poName').focus();
+}
+
+async function submitPullOut() {
+    const name = document.getElementById('poName').value.trim();
+    if (!name) { app.showAlert('Please enter the name of the person picking up', 'danger'); return; }
+    document.getElementById('pullOutModal').remove();
+    const result = await doScan(pendingBarcode, 'Parent Pickup');
+    if (result && result.student_id) {
+        try {
+            await api.post('/pull-outs', {
+                student_id: result.student_id,
+                scan_id: result.scan_id,
+                picked_up_by: name,
+                relationship: document.getElementById('poRelation')?.value || 'Parent',
+                purpose: document.getElementById('poPurpose')?.value || '',
+            });
+            app.showAlert('Pull-out recorded for ' + result.student, 'info');
+        } catch (err) {
+            app.showAlert('Scan done but pull-out record failed: ' + err.message, 'warning');
+        }
+    }
+    pendingBarcode = null;
+}
+
+async function doScan(code, exitType) {
+    scanInput.disabled = true;
+    document.getElementById('scanResult').innerHTML = '<div class="loading">Verifying...</div>';
+
+    try {
+        const body = { barcode: code };
+        if (exitType) body.exit_type = exitType;
+        const result = await api.scanAttendance(body);
+        const r = result.data;
+
+        if (r.requires_exit_type) {
+            showExitTypeModal(code);
+            scanInput.disabled = false;
+            scanInput.focus();
+            return;
+        }
+
+        if (r.type !== 'cooldown') {
+            realtime.broadcastScan({
+                student: r.student,
+                section: r.section,
+                photo: r.photo,
+                scan_type: r.scan_type,
+                exit_type: r.exit_type,
+                time: r.time,
+                status: r.status,
+            });
+        }
+
+        const photo = photoHtml(r.photo, r.student);
+
+        if (r.type === 'cooldown') {
+            document.getElementById('scanResult').innerHTML = `
+                <div class="scanner-result">
+                    <div style="font-size:48px; margin-bottom:10px;">⏳</div>
+                    ${photo}
+                    <div class="student-name">${r.student}</div>
+                    <div class="student-section">${r.section || ''}</div>
+                    <div style="color:var(--gray);font-size:14px;margin-top:8px;">${r.message} (last scan: ${r.last_scan})</div>
+                </div>`;
+            showToast(`${r.student}: ${r.message}`, 'warning');
+        } else if (r.scan_type === 'ENTRY') {
+            const icon = r.status && r.status === 'Late' ? '⚠️' : '✅';
+            const statusText = r.status ? `${r.status} ${r.late_minutes ? '(' + r.late_minutes + ' min late)' : ''}` : '';
+            const bgClass = r.status === 'Late' ? 'bg-warning' : 'bg-success';
+            document.getElementById('scanResult').innerHTML = `
+                <div class="scanner-result ${bgClass}">
+                    <div style="font-size:48px; margin-bottom:10px;">${icon}</div>
+                    ${photo}
+                    <div class="student-name">${r.student}</div>
+                    <div class="student-section">${r.section || ''}</div>
+                    ${statusText ? `<div class="status-display ${r.status}">${statusText}</div>` : ''}
+                    <div class="scan-time">ENTRY at ${r.time}</div>
+                </div>`;
+            lastScans.unshift({ student_id: r.student_id, name: r.student, photo: r.photo, status: r.status || 'ENTRY', time: r.time, type: 'ENTRY' });
+            showToast(`✅ ${r.student} — ${r.status || 'ENTRY'} at ${r.time}`, 'success');
+        } else if (r.scan_type === 'EXIT') {
+            document.getElementById('scanResult').innerHTML = `
+                <div class="scanner-result bg-info">
+                    <div style="font-size:48px; margin-bottom:10px;">🚪</div>
+                    ${photo}
+                    <div class="student-name">${r.student}</div>
+                    <div class="student-section">${r.section || ''}</div>
+                    <div style="color:var(--gray);font-size:14px;margin-top:8px;">${r.exit_type || 'Exit'}</div>
+                    <div class="scan-time">EXIT at ${r.time}</div>
+                </div>`;
+            lastScans.unshift({ student_id: r.student_id, name: r.student, photo: r.photo, status: r.exit_type || 'EXIT', time: r.time, type: 'EXIT' });
+            showToast(`🚪 ${r.student} — ${r.exit_type || 'EXIT'} at ${r.time}`, 'info');
+        }
+
+        if (lastScans.length > 20) lastScans.pop();
+        localStorage.setItem('lastScans', JSON.stringify(lastScans));
+        renderHistory();
+        return r;
+    } catch (err) {
+        document.getElementById('scanResult').innerHTML = `<div class="alert alert-danger" style="margin-top:12px;">${err.message}</div>`;
+        showToast(`Error: ${err.message}`, 'error');
+    } finally {
+        scanInput.value = '';
+        scanInput.disabled = false;
+        if (!document.querySelector('#exitTypeModal, #pullOutModal')) {
+            scanInput.focus();
+        }
+    }
+}
+
+scanInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+        const code = scanInput.value.trim();
+        if (!code) return;
+        if (isDuplicate(code)) {
+            showToast('Duplicate scan blocked (scanned within last 3s)', 'warning');
+            scanInput.value = '';
+            scanInput.focus();
+            return;
+        }
+        await doScan(code);
+    }
+});
+
+function renderHistory() {
+    const container = document.getElementById('scanHistory');
+    if (lastScans.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:var(--gray);padding:20px;">No scans yet.</div>';
+        return;
+    }
+    container.innerHTML = lastScans.map(s => {
+        const photo = s.photo
+            ? `<img src="${s.photo}" class="hist-photo">`
+            : `<div class="hist-photo-pl">${(s.name || '?')[0]}</div>`;
+        const badge = s.type === 'ENTRY' ? 'badge-success' : 'badge-info';
+        return `<div class="hist-item">
+            ${photo}
+            <div style="flex:1;min-width:0;">
+                <strong>${s.name}</strong>
+                ${s.student_id ? `<span style="font-size:11px;color:var(--gray);display:block;">#${s.student_id}</span>` : ''}
+            </div>
+            <span class="badge ${badge}" style="flex-shrink:0;">${s.type}</span>
+            <div style="text-align:right;flex-shrink:0;">
+                <span style="font-size:11px;color:var(--gray);display:block;">${s.time}</span>
+                <span style="font-size:11px;color:var(--gray);">${s.status}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+renderHistory();
+scanInput.focus();
+setupRefocus();
+document.addEventListener('click', ensureScanFocus);
+
+function openCameraScanner() {
+    const overlay = document.getElementById('cameraOverlay');
+    overlay.style.display = 'flex';
+    const status = document.getElementById('cameraStatus');
+    status.textContent = 'Requesting camera...';
+
+    const reader = document.getElementById('cameraReader');
+    reader.innerHTML = '';
+    status.textContent = 'Starting camera...';
+
+    const onDetect = (code) => {
+        closeCameraScanner();
+        document.getElementById('scanInput').value = code;
+        window.doScan(code);
+    };
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        if (!navigator.getUserMedia) {
+            status.innerHTML = 'Camera not supported. Use Chrome or Edge browser, or type barcode manually. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+            return;
+        }
+    }
+
+    status.textContent = 'Starting camera...';
+
+    function startCamera(useBack) {
+        if (useBack === undefined) useBack = true;
+        return navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: useBack ? 'environment' : 'user' } });
+    }
+
+    function startCameraExact() {
+        return navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { exact: 'environment' } } });
+    }
+
+    startCameraExact().catch(function() { return startCamera(true); }).then(function(stream) {
+        cameraStream = stream;
+        status.textContent = 'Scanning...';
+
+        if ('BarcodeDetector' in window) {
+            const video = document.createElement('video');
+            video.setAttribute('playsinline', '');
+            video.setAttribute('autoplay', '');
+            video.style.cssText = 'width:100%;height:auto;max-height:300px;object-fit:cover;border-radius:8px;';
+            reader.appendChild(video);
+            video.srcObject = stream;
+            video.play();
+
+            const detector = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_39'] });
+            let detectStart = Date.now();
+            const hintTimeout = setTimeout(() => {
+                if (status) status.innerHTML = 'Point camera at barcode and hold steady. <button onclick="closeCameraScanner()" class="btn btn-sm btn-secondary" style="margin-top:4px;">Cancel</button>';
+            }, 8000);
+
+            function detectFrame() {
+                if (!video || video.readyState < 2) { scanInterval = requestAnimationFrame(detectFrame); return; }
+                detector.detect(video).then(barcodes => {
+                    if (barcodes.length > 0) { clearTimeout(hintTimeout); onDetect(barcodes[0].rawValue); return; }
+                    if (Date.now() - detectStart > 15000) {
+                        if (status) status.innerHTML = 'No barcode found. Try moving closer or use text input. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+                        return;
+                    }
+                    scanInterval = requestAnimationFrame(detectFrame);
+                }).catch(() => {
+                    scanInterval = requestAnimationFrame(detectFrame);
+                });
+            }
+            detectFrame();
+        } else {
+            status.textContent = 'Loading scanner...';
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
+            script.onload = () => {
+                status.textContent = 'Starting decoder...';
+                reader.innerHTML = '';
+                const video = document.createElement('video');
+                video.setAttribute('playsinline', '');
+                video.setAttribute('autoplay', '');
+                video.style.cssText = 'width:100%;height:auto;max-height:300px;object-fit:cover;border-radius:8px;';
+                reader.appendChild(video);
+                video.srcObject = stream;
+                video.play();
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                let scanning = true;
+
+                function decodeFrame() {
+                    if (!scanning) return;
+                    if (video.readyState >= 2 && video.videoWidth > 0) {
+                        canvas.width = 320;
+                        canvas.height = 240;
+                        ctx.drawImage(video, 0, 0, 320, 240);
+                        const dataUrl = canvas.toDataURL('image/png');
+                        Quagga.decodeSingle({
+                            decoder: { readers: ['code_128_reader'] },
+                            locate: false,
+                            src: dataUrl
+                        }, (result) => {
+                            if (result && result.codeResult && result.codeResult.code) {
+                                scanning = false;
+                                onDetect(result.codeResult.code);
+                            } else {
+                                setTimeout(decodeFrame, 150);
+                            }
+                        });
+                    } else {
+                        setTimeout(decodeFrame, 150);
+                    }
+                }
+                decodeFrame();
+                cameraStream._stopScan = () => { scanning = false; };
+            };
+            script.onerror = () => {
+                status.innerHTML = 'Scanner library failed to load. Use text input instead. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+            };
+            document.body.appendChild(script);
+        }
+    }).catch(err => {
+        if (err.name === 'NotAllowedError') {
+            status.innerHTML = 'Camera access denied. Allow camera in browser settings. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+        } else if (err.name === 'NotFoundError') {
+            status.innerHTML = 'No camera found. Use text input instead. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+        } else {
+            status.innerHTML = 'Camera error: ' + err.message + '. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
+        }
+    });
+}
+
+function closeCameraScanner() {
+    if (scanInterval) { cancelAnimationFrame(scanInterval); clearTimeout(scanInterval); clearInterval(scanInterval); scanInterval = null; }
+    if (cameraStream) {
+        if (cameraStream._stopScan) cameraStream._stopScan();
+        if (cameraStream.getTracks) {
+            cameraStream.getTracks().forEach(t => t.stop());
+        }
+        cameraStream = null;
+    }
+    document.getElementById('cameraOverlay').style.display = 'none';
+    document.getElementById('cameraReader').innerHTML = '';
+    if (!scanInput.disabled) scanInput.focus();
+}
+
+// Listen for real-time scans from other tabs
+try {
+    const bc = new BroadcastChannel('gate_attendance');
+    bc.onmessage = (e) => {
+        if (e.data && e.data.type === 'scan' && e.data.student) {
+            lastScans.unshift({
+                student_id: e.data.student_id,
+                name: e.data.student,
+                photo: e.data.photo,
+                status: e.data.status || e.data.scan_type || 'SCAN',
+                time: e.data.time,
+                type: e.data.scan_type || 'SCAN',
+            });
+            if (lastScans.length > 20) lastScans.pop();
+            localStorage.setItem('lastScans', JSON.stringify(lastScans));
+        }
+    };
+} catch (_) {}
+</script>
+</body></html>
+

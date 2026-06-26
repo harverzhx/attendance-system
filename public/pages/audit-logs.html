@@ -1,0 +1,92 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Logs</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .action-badge { display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600; }
+    .action-CREATE { background:#f0fdf4;color:#16a34a; }
+    .action-UPDATE { background:#eff6ff;color:#2563eb; }
+    .action-DELETE { background:#fef2f2;color:#dc2626; }
+    .action-LOGIN { background:#f5f3ff;color:#7c3aed; }
+    .action-LOGOUT { background:#fef3c7;color:#d97706; }
+    .action-SCAN { background:#f0f9ff;color:#0284c7; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="filter-bar">
+    <div class="form-group"><label>Search</label><input type="search" class="form-control" id="auditSearch" placeholder="Name, action, desc..." oninput="debounceSearch()" style="min-width:140px;"></div>
+    <div class="form-group"><label>Action</label><select class="form-select" id="auditAction" onchange="loadAuditLogs()"><option value="">All</option><option value="LOGIN">LOGIN</option><option value="LOGOUT">LOGOUT</option><option value="SCAN">SCAN</option><option value="CREATE">CREATE</option><option value="UPDATE">UPDATE</option><option value="DELETE">DELETE</option></select></div>
+    <div class="form-group"><label>From</label><input type="date" class="form-control" id="auditFrom"></div>
+    <div class="form-group"><label>To</label><input type="date" class="form-control" id="auditTo"></div>
+    <button class="btn btn-primary" onclick="loadAuditLogs()">Search</button>
+</div>
+
+<div class="card">
+    <div id="audit-logs-table"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+// Set default dates
+const today = app.localDate();
+document.getElementById('auditTo').value = today;
+const d = new Date(); d.setDate(d.getDate() - 7);
+document.getElementById('auditFrom').value = d.toISOString().slice(0, 10);
+
+let searchTimer;
+function debounceSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadAuditLogs, 300);
+}
+
+async function loadAuditLogs() {
+    try {
+        const filters = {
+            action: document.getElementById('auditAction').value || null,
+            date_from: document.getElementById('auditFrom').value || null,
+            date_to: document.getElementById('auditTo').value || null,
+            search: document.getElementById('auditSearch').value || null,
+        };
+        const result = await api.getAuditLogs(filters);
+        const logs = result.data || [];
+
+        let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th>Date & Time</th><th>User</th><th>Action</th><th>Description</th><th>IP Address</th>
+        </tr></thead><tbody>`;
+
+        if (logs.length === 0) {
+            html += '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray);">No audit logs found.</td></tr>';
+        }
+
+        logs.forEach(l => {
+            html += `<tr>
+                <td style="white-space:nowrap;">${app.formatDateTime(l.created_at)}</td>
+                <td><strong>${l.full_name || 'System'}</strong></td>
+                <td><span class="action-badge action-${l.action}">${l.action}</span></td>
+                <td style="max-width:300px;">${l.description}</td>
+                <td><code style="font-size:12px;">${l.ip_address || '-'}</code></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        if (logs.length > 0) {
+            html += '<div style="font-size:12px;color:var(--gray);padding:8px 16px;text-align:right;">' + logs.length + ' log(s)</div>';
+        }
+        document.getElementById('audit-logs-table').innerHTML = html;
+    } catch (err) {
+        document.getElementById('audit-logs-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+loadAuditLogs();
+</script>
+</body></html>
+

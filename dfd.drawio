@@ -1,0 +1,454 @@
+<mxfile host="Electron" modified="2026-06-20T10:00:00.000Z" agent="Mozilla/5.0" version="21.3.2" etag="abc123">
+  <diagram name="DFD Level 0 - Context Diagram" id="page0">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title Block -->
+        <mxCell id="t0" value="DFD Level 0 — Context Diagram" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="5" width="500" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="School Gate Attendance System" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=14;fontStyle=0;color:#888;" vertex="1" parent="1">
+          <mxGeometry x="300" y="32" width="500" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- CENTER: Process (Gane & Sarson: rounded rectangle, numbered top-right) -->
+        <!-- ================================================================ -->
+        <mxCell id="sysBg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fb;strokeColor=#d0d8e8;arcSize=6;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="280" width="220" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="sysLabel" value="System Boundary" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=9;fontStyle=2;color:#999;" vertex="1" parent="1">
+          <mxGeometry x="390" y="445" width="220" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="sys" value="0&#10;School Gate&#10;Attendance&#10;System" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="420" y="320" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- EXTERNAL ENTITIES (Gane & Sarson: double square = rectangle with shadow) -->
+        <!-- ================================================================ -->
+
+        <!-- 1. ADMIN — top left -->
+        <mxCell id="admin" value="Admin" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="140" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 2. TEACHER / STAFF — bottom left -->
+        <mxCell id="teacher" value="Teacher /&#10;Staff" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#7b1fa2;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="560" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 3. PARENT — top right -->
+        <mxCell id="parent" value="Parent" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="810" y="140" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 4. STUDENT — bottom right -->
+        <mxCell id="student" value="Student" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fbe9e7;strokeColor=#c62828;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="810" y="560" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- DATA FLOWS (Gane & Sarson: straight arrows with noun labels) -->
+        <!-- ================================================================ -->
+
+        <!-- ADMIN ↔ SYSTEM (2 arrows: one each direction) -->
+        <mxCell id="a1" value="Login Credentials,&#10;Manage Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.3;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="admin" target="sys">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="Dashboard Data,&#10;Reports, Confirmations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.7;entryX=1;entryY=0.5;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="sys" target="admin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- TEACHER ↔ SYSTEM -->
+        <mxCell id="t1" value="Login Credentials,&#10;Attendance Records" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="teacher" target="sys">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="Class Lists,&#10;Section Reports" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="sys" target="teacher">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- PARENT ↔ SYSTEM -->
+        <mxCell id="p1" value="Login Credentials,&#10;View Request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.3;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="parent" target="sys">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" value="Email Notifications" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.7;entryX=0;entryY=0.5;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="sys" target="parent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" value="Attendance History" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.3;entryX=0;entryY=0.5;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="sys" target="parent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- STUDENT ↔ SYSTEM -->
+        <mxCell id="s1" value="Barcode / QR Scan" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="student" target="sys">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="Scan Result&#10;(Present / Late)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="sys" target="student">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- LEGEND — Gane & Sarson Notation -->
+        <!-- ================================================================ -->
+        <mxCell id="legBg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="230" y="670" width="540" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="legTitle" value="Gane &amp; Sarson Notation" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="670" width="540" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- External Entity -->
+        <mxCell id="legEE" value="  External Entity" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;shadow=1;fillColor=#fff;strokeColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="250" y="698" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="legEELabel" value="Source / Destination of data (person, organization)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;color:#666;" vertex="1" parent="1">
+          <mxGeometry x="390" y="698" width="350" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- Process -->
+        <mxCell id="legP" value="  Process" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;arcSize=6;fillColor=#fff;strokeColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="250" y="727" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="legPLabel" value="Transforms input data into output data (numbered)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;color:#666;" vertex="1" parent="1">
+          <mxGeometry x="390" y="727" width="350" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- Data Flow -->
+        <mxCell id="legF" value="  Data Flow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="250" y="756" width="130" height="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legFLabel" value="Movement of data (arrow with noun label)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;color:#666;" vertex="1" parent="1">
+          <mxGeometry x="390" y="750" width="350" height="18" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="DFD Level 1 - Internal Processes" id="page1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title Block -->
+        <mxCell id="t0" value="DFD Level 1 — Internal Processes" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="5" width="500" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="School Gate Attendance System" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=14;fontStyle=0;color:#888;" vertex="1" parent="1">
+          <mxGeometry x="350" y="32" width="500" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- DATA STORES (Gane & Sarson: open-ended rectangle, closed-left / open-right) -->
+        <!-- ================================================================ -->
+
+        <!-- D1 - User Accounts -->
+        <mxCell id="d1" value="D1&#10;User Accounts" style="shape=internalStorage;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f9a825;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;spacingLeft=0;" vertex="1" parent="1">
+          <mxGeometry x="230" y="55" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- D2 - Attendance Log -->
+        <mxCell id="d2" value="D2&#10;Attendance Log" style="shape=internalStorage;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f9a825;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;spacingLeft=0;" vertex="1" parent="1">
+          <mxGeometry x="230" y="300" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- D3 - Student Records -->
+        <mxCell id="d3" value="D3&#10;Student Records" style="shape=internalStorage;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f9a825;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;spacingLeft=0;" vertex="1" parent="1">
+          <mxGeometry x="820" y="300" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- D4 - Notification Log -->
+        <mxCell id="d4" value="D4&#10;Notification Log" style="shape=internalStorage;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f9a825;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;spacingLeft=0;" vertex="1" parent="1">
+          <mxGeometry x="820" y="630" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- EXTERNAL ENTITIES (Gane & Sarson: double square = shadowed rectangle) -->
+        <!-- ================================================================ -->
+
+        <!-- Admin -->
+        <mxCell id="ee1" value="Admin" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Teacher / Staff -->
+        <mxCell id="ee2" value="Teacher /&#10;Staff" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#7b1fa2;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="530" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Parent -->
+        <mxCell id="ee3" value="Parent" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="70" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Student -->
+        <mxCell id="ee4" value="Student" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fbe9e7;strokeColor=#c62828;fontStyle=1;fontSize=14;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="530" width="130" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PROCESSES (Gane & Sarson: rounded rectangles, numbered) -->
+        <!-- ================================================================ -->
+
+        <!-- 1.1 - Authenticate Users -->
+        <mxCell id="p11" value="1.1&#10;Authenticate&#10;Users" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="490" y="55" width="170" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- 1.2 - Record Attendance -->
+        <mxCell id="p12" value="1.2&#10;Record&#10;Attendance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="490" y="195" width="170" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- 1.3 - Manage Student Records -->
+        <mxCell id="p13" value="1.3&#10;Manage Student&#10;Records" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="490" y="335" width="170" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- 1.4 - Generate Reports -->
+        <mxCell id="p14" value="1.4&#10;Generate&#10;Reports" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="490" y="475" width="170" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- 1.5 - Send Notifications -->
+        <mxCell id="p15" value="1.5&#10;Send&#10;Notifications" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="490" y="615" width="170" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- DATA FLOWS — EXTERNAL ENTITIES → PROCESSES -->
+        <!-- ================================================================ -->
+
+        <!-- Admin → 1.1 -->
+        <mxCell id="f_adm11" value="Login Credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee1" target="p11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.1 → Admin -->
+        <mxCell id="f_11adm" value="Auth Result" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="ee1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Admin → 1.3 -->
+        <mxCell id="f_adm13" value="Student Record&#10;Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee1" target="p13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.3 → Admin -->
+        <mxCell id="f_13adm" value="Student Data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p13" target="ee1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Admin → 1.4 -->
+        <mxCell id="f_adm14" value="Report Requests,&#10;Dashboard Prefs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee1" target="p14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.4 → Admin -->
+        <mxCell id="f_14adm" value="Dashboard,&#10;Reports, Confirmations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p14" target="ee1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Teacher → 1.1 -->
+        <mxCell id="f_tch11" value="Login Credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee2" target="p11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.1 → Teacher -->
+        <mxCell id="f_11tch" value="Auth Result" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="ee2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Teacher → 1.2 -->
+        <mxCell id="f_tch12" value="Attendance&#10;Records" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee2" target="p12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Teacher → 1.3 -->
+        <mxCell id="f_tch13" value="Student Info&#10;Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee2" target="p13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.3 → Teacher -->
+        <mxCell id="f_13tch" value="Class Lists,&#10;Section Info" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p13" target="ee2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.4 → Teacher -->
+        <mxCell id="f_14tch" value="Section Reports" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p14" target="ee2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Parent → 1.1 -->
+        <mxCell id="f_par11" value="Login Credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee3" target="p11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.1 → Parent -->
+        <mxCell id="f_11par" value="Auth Result" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="ee3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Parent → 1.4 -->
+        <mxCell id="f_par14" value="Attendance&#10;History Request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee3" target="p14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.4 → Parent -->
+        <mxCell id="f_14par" value="Attendance&#10;History" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p14" target="ee3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.5 → Parent -->
+        <mxCell id="f_15par" value="Email&#10;Notifications" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p15" target="ee3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Student → 1.2 -->
+        <mxCell id="f_stu12" value="Barcode /&#10;QR Scan" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="ee4" target="p12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.2 → Student -->
+        <mxCell id="f_12stu" value="Scan Result&#10;(Present / Late)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p12" target="ee4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- DATA FLOWS — PROCESSES ↔ DATA STORES -->
+        <!-- ================================================================ -->
+
+        <!-- 1.1 ↔ D1 -->
+        <mxCell id="f_11d1_in" value="Verify Credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="d1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="220" y="130" as="sourcePoint" />
+            <mxPoint x="305" y="130" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f_d111_out" value="User Details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d1" target="p11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.2 ↔ D2 -->
+        <mxCell id="f_12d2_in" value="Write Record" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p12" target="d2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.2 → D3 -->
+        <mxCell id="f_12d3" value="Lookup Student" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p12" target="d3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- D3 → 1.2 -->
+        <mxCell id="f_d312" value="Student Info" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d3" target="p12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.3 ↔ D3 -->
+        <mxCell id="f_13d3_in" value="CRUD Operations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p13" target="d3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f_d313_out" value="Student Data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d3" target="p13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.4 → D2 -->
+        <mxCell id="f_14d2" value="Read Attendance" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p14" target="d2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- D2 → 1.4 -->
+        <mxCell id="f_d214" value="Attendance Data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d2" target="p14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.4 → D3 -->
+        <mxCell id="f_14d3" value="Read Student" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p14" target="d3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- D3 → 1.4 -->
+        <mxCell id="f_d314" value="Student Data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d3" target="p14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.5 → D2 -->
+        <mxCell id="f_15d2" value="Check Absences" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p15" target="d2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- D2 → 1.5 -->
+        <mxCell id="f_d215" value="Absence Data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d2" target="p15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.5 → D3 -->
+        <mxCell id="f_15d3" value="Read Parent Contact" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p15" target="d3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- D3 → 1.5 -->
+        <mxCell id="f_d315" value="Parent Contact" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d3" target="p15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.5 ↔ D4 -->
+        <mxCell id="f_15d4_in" value="Log Notification" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p15" target="d4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f_d415_out" value="Sent History" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="d4" target="p15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- INTER-PROCESS DATA FLOWS -->
+        <!-- ================================================================ -->
+
+        <!-- 1.1 → 1.2 -->
+        <mxCell id="f_1112" value="Auth Token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="p12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.1 → 1.3 -->
+        <mxCell id="f_1113" value="Auth Token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="p13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.1 → 1.4 -->
+        <mxCell id="f_1114" value="Auth Token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="p14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- 1.1 → 1.5 -->
+        <mxCell id="f_1115" value="Auth Token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p11" target="p15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.3 → 1.2 -->
+        <mxCell id="f_1312" value="Student Details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p13" target="p12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.2 → 1.4 -->
+        <mxCell id="f_1214" value="Attendance Data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p12" target="p14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 1.4 → 1.5 -->
+        <mxCell id="f_1415" value="Notify Triggers" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;spacing=2;align=center;strokeWidth=2;" edge="1" parent="1" source="p14" target="p15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- LEGEND — Gane & Sarson Notation -->
+        <!-- ================================================================ -->
+        <mxCell id="legBg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="730" width="520" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="legTitle" value="Gane &amp; Sarson Notation" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="730" width="520" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legEE" value="  External Entity" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;shadow=1;fillColor=#fff;strokeColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="360" y="754" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legDS" value="D  Data Store" style="shape=internalStorage;whiteSpace=wrap;html=1;fontSize=11;fillColor=#fff;strokeColor=#333;align=center;verticalAlign=middle;spacingLeft=0;" vertex="1" parent="1">
+          <mxGeometry x="530" y="754" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legP" value="  Process" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;arcSize=6;fillColor=#fff;strokeColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="700" y="754" width="130" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legF" value="  Data Flow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="360" y="795" width="130" height="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

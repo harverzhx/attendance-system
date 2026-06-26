@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><body>
+<h2>Malicious Website Test</h2>
+<p>This simulates a hacker's website trying to access your API.</p>
+
+<div id="result1">Testing API with CORS * ...</div>
+<div id="result2">Testing API with credentials ...</div>
+
+<script>
+fetch('http://localhost:8000/api/users')
+  .then(r => r.json())
+  .then(d => document.getElementById('result1').innerText = 'SUCCESS! Users accessed: ' + d.data?.length)
+  .catch(e => document.getElementById('result1').innerText = 'BLOCKED: ' + e.message);
+
+fetch('http://localhost:8000/api/users', { credentials: 'include' })
+  .then(r => r.json())
+  .then(d => document.getElementById('result2').innerText = 'SUCCESS with credentials: ' + d.data?.length)
+  .catch(e => document.getElementById('result2').innerText = 'BLOCKED with credentials: ' + e.message);
+</script>
+</body></html>

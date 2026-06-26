@@ -1,0 +1,609 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subjects</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .preset-grid { display:flex; flex-wrap:wrap; gap:6px; padding:12px 0; }
+    .preset-chip { padding:6px 14px; border:1px solid var(--border); border-radius:20px; font-size:13px; cursor:pointer; background:#f8fafc; transition:all 0.15s; }
+    .preset-chip:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .teacher-subj-card { padding:12px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="card">
+    <div class="card-header">Teacher Subject &amp; Section Assignment</div>
+        <div class="form-group" style="padding:12px;"><label>Select Teacher</label><select class="form-select" id="teacherSelect" onchange="loadTeacherData()"><option value="">Choose teacher...</option></select></div>
+
+        <!-- Qualified Subjects (auto from major) -->
+        <div style="padding:0 12px;">
+            <label style="font-weight:600;font-size:14px;">
+                🎓 Major-Based Qualified Subjects
+                <span class="help-icon" tabindex="0" style="margin-left:4px;">?<span class="tooltip-text">These subjects are auto-assigned based on the teacher's BSED major/specialization. Only these subjects will appear in the assignment dropdown below. To change, edit the teacher's specialization in their profile.</span></span>
+            </label>
+            <div id="teacherSpecialization" style="font-size:12px;margin-bottom:6px;"></div>
+            <div id="qualifiedSubjectsList" style="font-size:13px;margin-bottom:12px;"></div>
+        </div>
+
+        <!-- Section Assignment -->
+        <div style="padding:0 12px;">
+            <label style="font-weight:600;font-size:14px;">
+                📋 Assigned Sections
+                <span class="help-icon" tabindex="0" style="margin-left:4px;">?<span class="tooltip-text">Which sections the teacher can access for taking attendance. Without this, the section won't appear on the teacher's dashboard or class attendance page. Add/remove sections using the dropdown below.</span></span>
+            </label>
+            <div style="display:flex;gap:8px;margin:8px 0;">
+                <select class="form-select" id="assignSectionForTeacher" style="flex:1;"><option value="">Add section...</option></select>
+                <button class="btn btn-sm btn-success" onclick="assignSectionToTeacher()">+ Add</button>
+            </div>
+            <div id="teacherSectionsList" style="font-size:13px;margin-bottom:12px;"></div>
+        </div>
+
+        <!-- Subject Assignment -->
+        <div id="teacherSubjectAssign" style="padding:0 12px 12px;">
+            <label style="font-weight:600;font-size:14px;">
+                📖 Subjects per Section
+                <span class="help-icon" tabindex="0" style="margin-left:4px;">?<span class="tooltip-text">Which subject the teacher teaches in each section. Differs per section. Example: Teacher Juan → Math in Grade 7-A, Science in Grade 8-B. Only subjects matching the teacher's major are shown.</span></span>
+            </label>
+            <div style="display:flex;gap:8px;margin:8px 0;">
+                <select class="form-select" id="assignSectionSubject" style="flex:1;"><option value="">Section</option></select>
+                <select class="form-select" id="assignSubject" style="flex:1;"><option value="">Subject</option></select>
+                <button class="btn btn-sm btn-primary" onclick="assignSubject()">Assign</button>
+                <button class="btn btn-sm btn-outline" onclick="toggleBulkAssign()" style="white-space:nowrap;">📦 Bulk</button>
+            </div>
+            <!-- Bulk Assign Panel -->
+            <div id="bulkAssignPanel" style="display:none;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
+                <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+                    <select class="form-select" id="bulkSectionSelect" style="flex:1;"><option value="">Section</option></select>
+                    <button class="btn btn-sm btn-primary" onclick="bulkAssignSubjects()">Assign Selected</button>
+                    <button class="btn btn-sm btn-link" onclick="selectAllBulk(true)" style="padding:0;font-size:12px;">All</button>
+                    <button class="btn btn-sm btn-link" onclick="selectAllBulk(false)" style="padding:0;font-size:12px;">None</button>
+                </div>
+                <div id="bulkSubjectCheckboxes" style="max-height:200px;overflow-y:auto;font-size:13px;"></div>
+            </div>
+            <div id="teacherSubjectsList"><p style="color:var(--gray);font-size:13px;">Select a teacher to see their subjects.</p></div>
+        </div>
+    </div>
+
+<div id="presetSection" style="margin-top:8px;">
+    <div class="card">
+        <div class="card-header">Common Subjects (click to quick-add)</div>
+        <div class="preset-grid" id="presetGrid"></div>
+    </div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+    <div class="card-header">All Subjects
+        <span style="float:right;">
+            <button class="btn btn-sm btn-primary" onclick="showAddSubject()">+ Add Subject</button>
+            <button class="btn btn-sm btn-outline" onclick="seedPresets()">📚 Load Preset Subjects</button>
+        </span>
+    </div>
+    <div style="padding:8px 12px 0;">
+        <input type="text" class="form-control" id="subjectSearch" placeholder="Search subjects..." style="font-size:13px;padding:6px 10px;" oninput="filterSubjects()">
+    </div>
+    <div id="subjectsTable" style="max-height:400px;overflow-y:auto;"><div class="loading">Loading...</div></div>
+</div>
+
+<div id="subjectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:30px;width:500px;max-width:90%;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+            <h3 id="modalTitle" style="margin:0">Add Subject</h3>
+            <button type="button" onclick="closeModal()" style="background:none;border:none;font-size:22px;cursor:pointer;">&times;</button>
+        </div>
+        <form id="subjectForm" onsubmit="return saveSubject(event)">
+            <input type="hidden" id="editId">
+            <div class="form-group"><label>Subject Name</label><input type="text" class="form-control" id="s_name" placeholder="e.g. Filipino" required></div>
+            <div class="form-group"><label>Subject Code <small style="color:var(--gray);">(auto-generated if empty)</small></label><input type="text" class="form-control" id="s_code" placeholder="Auto-generated"></div>
+            <div class="form-group"><label>Category</label><select class="form-select" id="s_category"><option value="">No category</option><option value="JHS Core">JHS Core</option><option value="JHS Math &amp; Science">JHS Math &amp; Science</option><option value="SHS Core">SHS Core</option><option value="SHS Applied">SHS Applied</option><option value="SHS ABM">SHS ABM</option><option value="SHS HUMSS">SHS HUMSS</option><option value="SHS STEM">SHS STEM</option><option value="SHS TVL">SHS TVL</option><option value="Other">Other</option></select></div>
+            <div class="form-group"><label>Description</label><textarea class="form-control" id="s_desc" rows="3"></textarea></div>
+            <button type="submit" class="btn btn-primary" id="saveBtn">Save</button>
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+const PRESET_SUBJECTS = [
+    'Filipino','English','Mathematics','Science','Araling Panlipunan',
+    'MAPEH','Edukasyon sa Pagpapakatao','TLE','Computer Science',
+    'Values Education','Music','Arts','Physical Education','Health',
+    'Algebra','Geometry','Trigonometry','Statistics and Probability',
+    'Biology','Chemistry','Physics','Earth Science',
+    'Oral Communication','Reading and Writing',
+    'Komunikasyon at Pananaliksik sa Wika at Kulturang Filipino',
+    '21st Century Literature from the Philippines and the World',
+    'Contemporary Philippine Arts from the Regions',
+    'Media and Information Literacy','General Mathematics',
+    'Earth and Life Science','Physical Science',
+    'Personal Development','Understanding Culture, Society and Politics',
+    'Introduction to Philosophy of the Human Person',
+    'English for Academic and Professional Purposes',
+    'Practical Research 1','Practical Research 2',
+    'Filipino sa Piling Larangan','Empowerment Technologies',
+    'Inquiries, Investigation and Immersion',
+    'Organization and Management','Business Mathematics',
+    'Principles of Marketing','Applied Economics',
+    'Business Ethics and Social Responsibility',
+    'Fundamentals of Accountancy, Business and Management 1',
+    'Fundamentals of Accountancy, Business and Management 2',
+    'Creative Writing','Creative Nonfiction',
+    'World Religions and Belief Systems','Philippine Politics and Governance',
+    'Community Engagement, Solidarity, and Citizenship',
+    'Trends, Networks, and Critical Thinking in the 21st Century',
+    'Disciplines and Ideas in the Social Sciences',
+    'Disciplines and Ideas in the Applied Social Sciences',
+    'Pre-Calculus','Basic Calculus',
+    'General Biology 1','General Biology 2',
+    'General Chemistry 1','General Chemistry 2',
+    'General Physics 1','General Physics 2',
+    'Bread and Pastry Production','Food and Beverage Services',
+    'Cookery','Housekeeping','Front Office Services',
+    'Computer Systems Servicing','Programming',
+    'Animation','Dressmaking','Tailoring',
+    'Electrical Installation and Maintenance',
+    'Electronic Products Assembly and Servicing',
+];
+
+let _allSubjectsData = [];
+
+function filterSubjects() {
+    const q = document.getElementById('subjectSearch').value.toLowerCase();
+    const data = _allSubjectsData;
+    const container = document.getElementById('subjectsTable');
+    const filtered = q ? data.filter(s =>
+        s.subject_name.toLowerCase().includes(q) ||
+        (s.subject_code || '').toLowerCase().includes(q) ||
+        (s.description || '').toLowerCase().includes(q)
+    ) : data;
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p style="text-align:center;padding:20px;color:var(--gray);font-size:13px;">No subjects match your search.</p>';
+        return;
+    }
+    let html = `<div class="table-responsive"><table class="table"><thead><tr><th>Code</th><th>Name</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
+    filtered.forEach(s => {
+        html += `<tr>
+            <td><code>${s.subject_code}</code></td>
+            <td>${s.subject_name}</td>
+            <td>${s.description || '-'}</td>
+            <td>${app.statusBadge(s.status)}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editSubject(${s.subject_id})">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSubject(${s.subject_id})">Delete</button>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+async function loadSubjects() {
+    try {
+        const r = await api.get('/subjects');
+        _allSubjectsData = r.data || [];
+        const container = document.getElementById('subjectsTable');
+        if (!container) return;
+        if (_allSubjectsData.length === 0) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:var(--gray);font-size:13px;">No subjects yet. Click "Load Preset Subjects" or add manually.</p>';
+            renderPresets(_allSubjectsData);
+            return;
+        }
+        filterSubjects();
+        renderPresets(_allSubjectsData);
+    } catch (_) {}
+}
+
+function renderPresets(existing) {
+    const existingNames = new Set((existing || []).map(s => s.subject_name));
+    const grid = document.getElementById('presetGrid');
+    const available = PRESET_SUBJECTS.filter(n => !existingNames.has(n));
+    if (available.length === 0) {
+        grid.innerHTML = '<span style="color:var(--gray);font-size:13px;">All common subjects have been added.</span>';
+        return;
+    }
+    grid.innerHTML = available.map(name =>
+        `<span class="preset-chip" onclick="quickAddPreset('${name.replace(/'/g, "\\'")}')">+ ${name}</span>`
+    ).join('');
+}
+
+async function quickAddPreset(name) {
+    try {
+        await api.post('/subjects', { subject_name: name });
+        app.showAlert(`"${name}" added`, 'success');
+        loadSubjects();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+async function seedPresets() {
+    try {
+        const r = await api.post('/subjects/seed-presets');
+        app.showAlert(r.data.message || 'Presets loaded', 'success');
+        loadSubjects();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+function showAddSubject() {
+    document.getElementById('modalTitle').textContent = 'Add Subject';
+    document.getElementById('editId').value = '';
+    document.getElementById('s_name').value = '';
+    document.getElementById('s_code').value = '';
+    document.getElementById('s_category').value = '';
+    document.getElementById('s_desc').value = '';
+    document.getElementById('subjectModal').style.display = 'flex';
+    document.getElementById('s_name').focus();
+}
+
+function closeModal() {
+    document.getElementById('subjectModal').style.display = 'none';
+}
+
+async function saveSubject(e) {
+    e.preventDefault();
+    const id = document.getElementById('editId').value;
+    const data = {
+        subject_name: document.getElementById('s_name').value.trim(),
+        category: document.getElementById('s_category').value || 'Other',
+        description: document.getElementById('s_desc').value.trim(),
+    };
+    const code = document.getElementById('s_code').value.trim();
+    if (code) data.subject_code = code;
+
+    try {
+        if (id) {
+            await api.put(`/subjects/${id}`, data);
+            app.showAlert('Subject updated', 'success');
+        } else {
+            if (!data.subject_name) { app.showAlert('Subject name required', 'warning'); return; }
+            await api.post('/subjects', data);
+            app.showAlert('Subject created', 'success');
+        }
+        closeModal();
+        loadSubjects();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+async function editSubject(id) {
+    try {
+        const r = await api.get(`/subjects/${id}`);
+        const s = r.data;
+        document.getElementById('modalTitle').textContent = 'Edit Subject';
+        document.getElementById('editId').value = id;
+        document.getElementById('s_name').value = s.subject_name;
+        document.getElementById('s_code').value = s.subject_code;
+        document.getElementById('s_category').value = s.category || '';
+        document.getElementById('s_desc').value = s.description || '';
+        document.getElementById('subjectModal').style.display = 'flex';
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+async function deleteSubject(id) {
+    if (!confirm('Delete this subject?')) return;
+    try {
+        await api.del(`/subjects/${id}`);
+        app.showAlert('Subject deleted', 'info');
+        loadSubjects();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+// ─── TEACHER SUBJECT ASSIGNMENT ───
+async function loadTeachers() {
+    try {
+        const r = await api.getUsers();
+        const teachers = (r.data || []).filter(u => u.role_name === 'Teacher' || u.role_name === 'Adviser');
+        const sel = document.getElementById('teacherSelect');
+        sel.innerHTML = '<option value="">Choose teacher...</option>';
+        teachers.forEach(t => {
+            sel.innerHTML += `<option value="${t.user_id}">${t.first_name} ${t.last_name} (${t.role_name})</option>`;
+        });
+    } catch (_) {}
+}
+
+async function loadTeacherData() {
+    const teacherId = document.getElementById('teacherSelect').value;
+    const container = document.getElementById('teacherSubjectsList');
+    const bulkPanel = document.getElementById('bulkAssignPanel');
+    bulkPanel.style.display = 'none';
+    if (!teacherId) {
+        container.innerHTML = '<p style="color:var(--gray);font-size:13px;">Select a teacher.</p>';
+        document.getElementById('teacherSectionsList').innerHTML = '';
+        document.getElementById('qualifiedSubjectsList').innerHTML = '';
+        document.getElementById('teacherSpecialization').innerHTML = '';
+        _lastFilteredSubjects = [];
+        return;
+    }
+    await Promise.all([
+        loadTeacherSections(teacherId),
+        loadTeacherSubjects(teacherId),
+        loadQualifiedSubjects(teacherId)
+    ]);
+}
+
+let _lastFilteredSubjects = [];
+
+// ─── MAJOR-TO-SUBJECTS MAPPING ───
+async function findTeacher(teacherId) {
+    try {
+        const r = await api.getUsers();
+        return (r.data || []).find(u => u.user_id == teacherId) || null;
+    } catch (_) { return null; }
+}
+
+// ─── QUALIFIED SUBJECTS (auto from major) ───
+async function loadQualifiedSubjects(teacherId) {
+    const listEl = document.getElementById('qualifiedSubjectsList');
+    const specEl = document.getElementById('teacherSpecialization');
+    try {
+        const teacher = await findTeacher(teacherId);
+        const spec = teacher ? (teacher.specialization || '') : '';
+        const mappedNames = app.getMajorSubjects(spec);
+
+        if (!spec) {
+            specEl.innerHTML = '<span style="color:#d97706;">⚠️ No BSED major set. <a href="/users" style="text-decoration:underline;">Edit profile</a> to add specialization, or all subjects will be shown.</span>';
+            return;
+        }
+
+        const subR = await api.get('/subjects');
+        const allSubjects = subR.data || [];
+        const qualified = allSubjects.filter(s => mappedNames.includes(s.subject_name));
+
+        specEl.innerHTML = `🎓 Major: <strong>${spec}</strong> <small style="color:var(--gray);">(${mappedNames.length} subject(s) mapped, ${qualified.length} found in system)</small>`;
+
+        if (qualified.length === 0) {
+            listEl.innerHTML = '<p style="color:var(--gray);font-size:11px;">No matching subjects found in the system for this major. Add subjects first.</p>';
+        } else {
+            // Group by category for display
+            const groups = {};
+            qualified.forEach(s => {
+                const cat = s.category || 'Other';
+                if (!groups[cat]) groups[cat] = [];
+                groups[cat].push(s);
+            });
+            listEl.innerHTML = Object.entries(groups).map(([cat, items]) =>
+                `<div style="font-size:11px;font-weight:600;color:var(--gray);margin:4px 0 2px;">${cat}</div>` +
+                items.map(s => `<span style="display:inline-block;padding:2px 10px;background:#f0fdf4;color:#16a34a;border-radius:12px;font-size:12px;margin:2px;">${s.subject_code} - ${s.subject_name}</span>`).join('')
+            ).join('');
+        }
+    } catch (_) {
+        listEl.innerHTML = '<p style="color:var(--gray);font-size:11px;">Could not load subjects.</p>';
+    }
+}
+
+async function loadTeacherSections(teacherId) {
+    try {
+        const secR = await api.getSections();
+        const secSel = document.getElementById('assignSectionForTeacher');
+        secSel.innerHTML = '<option value="">Add section...</option>';
+        (secR.data || []).forEach(s => secSel.innerHTML += `<option value="${s.section_id}">${s.grade_level} ${s.section_name}</option>`);
+
+        // Get teacher's assigned sections
+        const tsR = await api.get('/teacher-sections?teacher_id=' + teacherId);
+        const sections = tsR.data || [];
+
+        // Filter out already-assigned sections from the dropdown
+        const assignedIds = new Set(sections.map(s => s.section_id));
+        Array.from(secSel.options).forEach(opt => {
+            if (opt.value && assignedIds.has(parseInt(opt.value))) opt.remove();
+        });
+
+        const listEl = document.getElementById('teacherSectionsList');
+        if (sections.length === 0) {
+            listEl.innerHTML = '<p style="color:var(--gray);font-size:11px;">No sections assigned yet.</p>';
+        } else {
+            listEl.innerHTML = sections.map(s => `
+                <span style="display:inline-block;padding:2px 10px;background:#eff6ff;color:#2563eb;border-radius:12px;font-size:12px;margin:2px;">
+                    ${s.grade_level} ${s.section_name}
+                    <span style="cursor:pointer;margin-left:4px;" onclick="removeSectionFromTeacher(${teacherId},${s.section_id})">&times;</span>
+                </span>
+            `).join(' ');
+        }
+    } catch (_) {}
+}
+
+async function loadTeacherSubjects(teacherId) {
+    const container = document.getElementById('teacherSubjectsList');
+    try {
+        const secR = await api.getSections();
+        const subR = await api.get('/subjects');
+        const teacher = await findTeacher(teacherId);
+        const spec = teacher ? (teacher.specialization || '') : '';
+        const mappedNames = app.getMajorSubjects(spec);
+
+        let filteredSubjects = subR.data || [];
+        if (spec && mappedNames.length > 0) {
+            filteredSubjects = filteredSubjects.filter(s => mappedNames.includes(s.subject_name));
+        }
+        _lastFilteredSubjects = filteredSubjects;
+
+        const secSel = document.getElementById('assignSectionSubject');
+        const subSel = document.getElementById('assignSubject');
+        secSel.innerHTML = '<option value="">Section</option>';
+        (secR.data || []).forEach(s => secSel.innerHTML += `<option value="${s.section_id}">${s.grade_level} ${s.section_name}</option>`);
+        // Group by category
+        const subGroups = {};
+        filteredSubjects.forEach(s => {
+            const cat = s.category || 'Other';
+            if (!subGroups[cat]) subGroups[cat] = [];
+            subGroups[cat].push(s);
+        });
+        let subHtml = '<option value="">Subject</option>';
+        for (const [cat, items] of Object.entries(subGroups)) {
+            subHtml += `<optgroup label="${cat}">`;
+            items.forEach(s => { subHtml += `<option value="${s.subject_id}">${s.subject_code} - ${s.subject_name}</option>`; });
+            subHtml += '</optgroup>';
+        }
+        subSel.innerHTML = subHtml;
+
+        const tsR = await api.get('/teacher-subjects?teacher_id=' + teacherId);
+        const assignments = tsR.data || [];
+
+        if (assignments.length === 0) {
+            container.innerHTML = '<p style="color:var(--gray);font-size:13px;">No subjects assigned yet. Use the form above to assign.</p>';
+            return;
+        }
+
+        container.innerHTML = assignments.map(a => `
+            <div class="teacher-subj-card" style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <strong>${a.subject_name}</strong>
+                    <span style="font-size:12px;color:var(--gray);margin-left:8px;">${a.subject_code}</span>
+                    <br><small style="color:var(--primary);">${a.grade_level} ${a.section_name}</small>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="removeTeacherSubject(${teacherId},${a.section_id},${a.subject_id})">Remove</button>
+            </div>
+        `).join('');
+    } catch (err) {
+        container.innerHTML = `<p style="color:var(--danger);font-size:13px;">${err.message}</p>`;
+    }
+}
+
+async function assignSectionToTeacher() {
+    const teacherId = document.getElementById('teacherSelect').value;
+    const sectionId = document.getElementById('assignSectionForTeacher').value;
+    if (!teacherId || !sectionId) { app.showAlert('Select teacher and section', 'warning'); return; }
+    try {
+        await api.post('/teacher-sections/assign', { section_id: parseInt(sectionId), teacher_id: parseInt(teacherId) });
+        app.showAlert('Section assigned', 'success');
+        loadTeacherData();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+async function removeSectionFromTeacher(teacherId, sectionId) {
+    try {
+        await api.post('/teacher-sections/remove', { section_id: sectionId, teacher_id: teacherId });
+        app.showAlert('Section removed', 'info');
+        loadTeacherData();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+async function assignSubject() {
+    const teacherId = document.getElementById('teacherSelect').value;
+    const sectionId = document.getElementById('assignSectionSubject').value;
+    const subjectId = document.getElementById('assignSubject').value;
+    if (!teacherId || !sectionId || !subjectId) { app.showAlert('Teacher, Section, and Subject required', 'warning'); return; }
+    try {
+        await api.post('/teacher-subjects/assign', { teacher_id: parseInt(teacherId), section_id: parseInt(sectionId), subject_id: parseInt(subjectId) });
+        app.showAlert('Assigned successfully', 'success');
+        loadTeacherData();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+async function removeTeacherSubject(teacherId, sectionId, subjectId) {
+    if (!confirm('Remove this assignment?')) return;
+    try {
+        await api.post('/teacher-subjects/remove', { teacher_id: teacherId, section_id: sectionId, subject_id: subjectId });
+        app.showAlert('Removed', 'info');
+        loadTeacherData();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+// ─── BULK ASSIGN ───
+let _bulkSubjectsCache = [];
+
+function toggleBulkAssign() {
+    const panel = document.getElementById('bulkAssignPanel');
+    const teacherId = document.getElementById('teacherSelect').value;
+    if (!teacherId) { app.showAlert('Select a teacher first', 'warning'); return; }
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel.style.display === 'block') loadBulkAssignSubjects(teacherId);
+}
+
+async function loadBulkAssignSubjects(teacherId) {
+    const subSel = document.getElementById('assignSubject');
+    const secSel = document.getElementById('bulkSectionSelect');
+    const checkContainer = document.getElementById('bulkSubjectCheckboxes');
+
+    // Populate section dropdown
+    const secR = await api.getSections();
+    const sections = secR.data || [];
+    secSel.innerHTML = '<option value="">Section</option>';
+    sections.forEach(s => secSel.innerHTML += `<option value="${s.section_id}">${s.grade_level} ${s.section_name}</option>`);
+
+    // Use same filtered subjects from single-assign dropdown
+    const subIds = Array.from(subSel.options).filter(o => o.value).map(o => o.value);
+    const allSubjects = _lastFilteredSubjects ? _lastFilteredSubjects.filter(s => subIds.includes(String(s.subject_id))) : [];
+    _bulkSubjectsCache = allSubjects;
+
+    // Populate checkboxes grouped by category
+    const bulkGroups = {};
+    allSubjects.forEach(s => {
+        const cat = s.category || 'Other';
+        if (!bulkGroups[cat]) bulkGroups[cat] = [];
+        bulkGroups[cat].push(s);
+    });
+    let bulkHtml = '';
+    for (const [cat, items] of Object.entries(bulkGroups)) {
+        bulkHtml += `<div style="font-size:11px;font-weight:600;color:var(--gray);margin:6px 0 2px;">${cat}</div>`;
+        items.forEach(s => {
+            bulkHtml += `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;font-size:13px;">
+                <input type="checkbox" class="bulk-subj-cb" value="${s.subject_id}">
+                ${s.subject_code} - ${s.subject_name}
+            </label>`;
+        });
+    }
+    checkContainer.innerHTML = bulkHtml;
+}
+
+function selectAllBulk(checked) {
+    document.querySelectorAll('.bulk-subj-cb').forEach(cb => cb.checked = checked);
+}
+
+async function bulkAssignSubjects() {
+    const teacherId = document.getElementById('teacherSelect').value;
+    const sectionId = document.getElementById('bulkSectionSelect').value;
+    if (!teacherId || !sectionId) { app.showAlert('Select teacher and section', 'warning'); return; }
+
+    const checked = Array.from(document.querySelectorAll('.bulk-subj-cb:checked')).map(cb => cb.value);
+    if (checked.length === 0) { app.showAlert('Select at least one subject', 'warning'); return; }
+
+    let success = 0, failed = 0;
+    for (const subjectId of checked) {
+        try {
+            await api.post('/teacher-subjects/assign', {
+                teacher_id: parseInt(teacherId),
+                section_id: parseInt(sectionId),
+                subject_id: parseInt(subjectId)
+            });
+            success++;
+        } catch (_) { failed++; }
+    }
+    app.showAlert(`Assigned ${success} subject(s) to section${failed ? ', ' + failed + ' failed' : ''}`, success > 0 ? 'success' : 'danger');
+    selectAllBulk(false);
+    loadTeacherData();
+}
+
+// Override GET /teacher-subjects to accept teacher_id param
+const origGet = api.get;
+api.get = function(endpoint) {
+    return origGet.call(this, endpoint);
+};
+
+loadSubjects();
+loadTeachers();
+</script>
+</body></html>
+

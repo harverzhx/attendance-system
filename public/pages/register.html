@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Gate Attendance System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-card" style="max-width:500px">
+            <div class="logo">
+                <h1>🏫</h1>
+                <h2>Create Account</h2>
+                <p style="color: #64748b; font-size: 14px;">Register as Teacher, Staff, Viewer, or Parent</p>
+            </div>
+            <div id="alert-container"></div>
+            <div id="form-alert" style="display:none"></div>
+        <form id="registerForm" novalidate>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>First Name <span class="help-icon" tabindex="0">?<span class="tooltip-text">Enter the legal first name. Auto-formatted to Proper Case.</span></span></label>
+                    <input type="text" class="form-control" id="first_name" onblur="toProperCase(this)">
+                </div>
+                <div class="form-group">
+                    <label>Middle Name</label>
+                    <input type="text" class="form-control" id="middle_name" onblur="toProperCase(this)">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Last Name <span class="help-icon" tabindex="0">?<span class="tooltip-text">Enter the legal last name (surname). Auto-formatted to Proper Case.</span></span></label>
+                    <input type="text" class="form-control" id="last_name" onblur="toProperCase(this)">
+                </div>
+                <div class="form-group">
+                    <label>Contact Number <span class="help-icon" tabindex="0">?<span class="tooltip-text">Philippine mobile number. Accepted: +63 9123456789, 09123456789, or 9123456789.</span></span></label>
+                    <input type="text" class="form-control" id="contact_number" placeholder="e.g. +63 9123456789" oninput="validateContactNumber(this)" onblur="formatContactNumber(this)">
+                    <small style="color:#64748b;font-size:11px">Philippine format: +63 9xxxxxxxxx or 09xxxxxxxxx</small>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Email <span class="help-icon" tabindex="0">?<span class="tooltip-text">Enter a valid email address. The system checks if the domain exists (e.g. @gmail.com, @yahoo.com).</span></span></label>
+                <input type="email" class="form-control" id="email" onblur="validateEmailField(this)">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Username <span class="help-icon" tabindex="0">?<span class="tooltip-text">Username for login. Auto-capitalized (e.g. "maria" → "Maria"). Must be unique.</span></span></label>
+                    <input type="text" class="form-control" id="username">
+                </div>
+                <div class="form-group">
+                    <label>Role <span class="help-icon" tabindex="0">?<span class="tooltip-text">Teacher = regular teacher. Staff = gate personnel. Viewer = view-only. Parent = for guardians.</span></span></label>
+                    <select class="form-select" id="role">
+                            <option value="Teacher">Teacher</option>
+                            <option value="Staff">Staff</option>
+                            <option value="Viewer">Viewer</option>
+                            <option value="Parent">Parent</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="specializationGroup" class="form-group" style="display:none;">
+                    <label>BSED Major / Specialization <span class="help-icon" tabindex="0">?<span class="tooltip-text">Pili-a ang imong major sa college. Makatabang ni sa admin kung unsa nga subjects imong kaya i-handle.</span></span></label>
+                    <select class="form-select" id="specialization">
+                        <option value="">Select major...</option>
+                        <option value="English">English</option>
+                        <option value="Filipino">Filipino</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Science">Science</option>
+                        <option value="General Science">General Science</option>
+                        <option value="Biology">Biology</option>
+                        <option value="Chemistry">Chemistry</option>
+                        <option value="Physics">Physics</option>
+                        <option value="Social Studies">Social Studies</option>
+                        <option value="History">History</option>
+                        <option value="Economics">Economics</option>
+                        <option value="Geography">Geography</option>
+                        <option value="Values Education">Values Education</option>
+                        <option value="Religious Education">Religious Education</option>
+                        <option value="SPED">Special Education (SPED)</option>
+                        <option value="TLE">Technology and Livelihood Education (TLE)</option>
+                        <option value="Home Economics">Home Economics</option>
+                        <option value="Industrial Arts">Industrial Arts</option>
+                        <option value="ICT">Information and Communications Technology (ICT)</option>
+                        <option value="MAPEH">MAPEH</option>
+                        <option value="Physical Education">Physical Education</option>
+                        <option value="Music Education">Music Education</option>
+                        <option value="Arts Education">Arts Education</option>
+                        <option value="Health Education">Health Education</option>
+                        <option value="Early Childhood Education">Early Childhood Education</option>
+                        <option value="Reading Education">Reading Education</option>
+                        <option value="Guidance and Counseling">Guidance and Counseling</option>
+                        <option value="Library Science">Library and Information Science</option>
+                        <option value="Agricultural Education">Agricultural Education</option>
+                        <option value="Fisheries Education">Fisheries Education</option>
+                        <option value="Entrepreneurship Education">Entrepreneurship Education</option>
+                        <option value="Environmental Education">Environmental Education</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" class="form-control" id="password" minlength="8">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg" style="width:100%">Submit Registration</button>
+            </form>
+            <div style="text-align:center; margin-top:20px;">
+                <a href="/pages/login.html" style="color: var(--primary); text-decoration: none; font-size: 14px;">Already have an account? Sign in</a>
+            </div>
+        </div>
+    </div>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js?v=1"></script>
+    <script>
+        function toProperCase(el) {
+            el.value = el.value.replace(/\w\S*/g, function(txt) {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            });
+        }
+
+        function validateContactNumber(el) {
+            const val = el.value.trim();
+            if (!val) { el.style.borderColor = ''; return true; }
+            const cleaned = val.replace(/[\s\-\(\)]/g, '');
+            const isValid = /^(?:\+63|0)?9\d{9}$/.test(cleaned);
+            if (!isValid) {
+                el.style.borderColor = 'red';
+                return false;
+            }
+            el.style.borderColor = '';
+            return true;
+        }
+
+        function formatContactNumber(el) {
+            let val = el.value.replace(/[^\d+]/g, '');
+            if (!val.startsWith('+') && val.length > 0) {
+                if (val.startsWith('63')) {
+                    val = '+' + val;
+                } else if (val.startsWith('0')) {
+                } else {
+                }
+            }
+            el.value = val;
+        }
+
+        function validateEmailField(el) {
+            const val = el.value.trim();
+            if (!val) return;
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+            if (!re.test(val)) {
+                app.showAlert('Please enter a valid email address.', 'danger');
+                el.focus();
+                return false;
+            }
+            const domain = val.substring(val.indexOf('@') + 1);
+            if (!/\.([a-zA-Z]{2,})$/.test(domain)) {
+                app.showAlert('Please enter a valid email address.', 'danger');
+                el.focus();
+                return false;
+            }
+            return true;
+        }
+
+        async function checkRegistration() {
+            try {
+                const res = await fetch('/api/auth/registration-status');
+                const result = await res.json();
+                if (result.success && !result.data.registration_enabled) {
+                    document.getElementById('registerForm').innerHTML = '<div class="alert alert-danger">Registration is currently disabled. Please contact the administrator.</div>';
+                }
+            } catch (e) {}
+        }
+        checkRegistration();
+
+        // Toggle specialization field when role changes
+        document.getElementById('role').addEventListener('change', function() {
+            const sg = document.getElementById('specializationGroup');
+            sg.style.display = (this.value === 'Teacher' || this.value === 'Adviser') ? 'block' : 'none';
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pw = document.getElementById('password').value;
+            const cpw = document.getElementById('confirm_password').value;
+            if (pw !== cpw) { app.showAlert('Passwords do not match', 'danger'); return; }
+
+            // Validate contact number
+            const contactEl = document.getElementById('contact_number');
+            if (contactEl.value.trim()) {
+                if (!validateContactNumber(contactEl)) {
+                    app.showAlert('Please enter a valid Philippine contact number (e.g. +63 9xxxxxxxxx or 09xxxxxxxxx).', 'danger');
+                    return;
+                }
+            }
+
+            // Validate email
+            const emailEl = document.getElementById('email');
+            if (!validateEmailField(emailEl)) return;
+
+            // Format names to proper case
+            toProperCase(document.getElementById('first_name'));
+            toProperCase(document.getElementById('last_name'));
+            toProperCase(document.getElementById('middle_name'));
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = 'Submitting...';
+
+            try {
+                const result = await api.register({
+                    first_name: document.getElementById('first_name').value,
+                    middle_name: document.getElementById('middle_name').value,
+                    last_name: document.getElementById('last_name').value,
+                    email: document.getElementById('email').value,
+                    contact_number: document.getElementById('contact_number').value,
+                    username: document.getElementById('username').value,
+                    password: pw,
+                    role: document.getElementById('role').value,
+                    specialization: document.getElementById('specialization').value || null,
+                });
+                app.showFormAlert('Registration submitted! Wait for admin approval.', 'success');
+                setTimeout(() => window.location.href = '/pages/login.html', 2000);
+            } catch (err) {
+                app.showFormAlert(err.message, 'danger');
+                btn.disabled = false; btn.textContent = 'Submit Registration';
+            }
+        });
+    </script>
+</body>
+</html>
+

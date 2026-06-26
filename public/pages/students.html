@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Students - Gate Attendance System</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/jsbarcode.all.min.js"></script>
+    <style>
+        .barcode-img { cursor:pointer; background:#fff; border-radius:4px; padding:2px; border:1px solid #e2e8f0; display:inline-block; }
+        .barcode-img:hover { border-color:var(--primary); }
+        .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        @media (max-width:768px) { .table-wrap table { font-size:13px; } .table-wrap th, .table-wrap td { white-space:nowrap; padding:6px 8px; } }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main-content">
+        <div class="topbar" id="topbar"></div>
+        <div id="alert-container"></div>
+
+        <div class="filter-bar">
+            <div class="form-group"><input type="search" class="form-control" id="searchStudent" placeholder="Search name, LRN, student #..." oninput="loadStudents()"></div>
+            <div class="form-group"><select class="form-select" id="filterGrade" onchange="loadSectionFilter()"><option value="">All Grades</option></select></div>
+            <div class="form-group"><select class="form-select" id="filterSection" onchange="loadStudents()"><option value="">All Sections</option></select></div>
+            <div class="form-group"><select class="form-select" id="filterStatus" onchange="loadStudents()"><option value="">All Status</option><option value="Active">Active</option><option value="Inactive">Inactive</option><option value="Graduated">Graduated</option><option value="Transferred">Transferred</option></select></div>
+            <button class="btn btn-primary" onclick="showAddStudent()" id="addStudentBtn">+ Add Student</button>
+        </div>
+
+        <div class="card">
+            <div id="students-table"><div class="loading">Loading...</div></div>
+        </div>
+    </div>
+
+    <div id="studentModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:12px; padding:30px; width:700px; max-width:90%; max-height:90vh; overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+                <h3 id="studentModalTitle" style="margin:0">Add Student</h3>
+                <button type="button" onclick="closeStudentModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;padding:0;line-height:1">&times;</button>
+            </div>
+            <div id="form-alert" style="display:none"></div>
+            <form id="studentForm">
+                <h4 style="margin:15px 0 10px;font-size:14px;color:var(--primary)">Student Information</h4>
+                <div class="form-row">
+                    <div class="form-group"><label>Student ID <span class="help-icon" tabindex="0">?<span class="tooltip-text">School ID number. Auto-generated if blank. Base for barcode.</span></span></label><input type="text" class="form-control" id="s_student_number"><small style="color:#64748b;font-size:11px">Optional — auto-generated if blank (e.g. 2026-0001)</small></div>
+                    <div class="form-group"><label>LRN * <span class="help-icon" tabindex="0">?<span class="tooltip-text">Learner Reference Number — 12-digit DepEd number. Numbers only.</span></span></label><input type="text" class="form-control" id="s_lrn" required onblur="validateLRN(this)"><small style="color:#64748b;font-size:11px">Numbers only, 12 digits</small></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>First Name * <span class="help-icon" tabindex="0">?<span class="tooltip-text">Student's legal first name. Auto-formatted to Proper Case.</span></span></label><input type="text" class="form-control" id="s_first_name" required onblur="toProperCase(this)"></div>
+                    <div class="form-group"><label>Middle Name <span class="help-icon" tabindex="0">?<span class="tooltip-text">Student's middle name (optional). Leave blank if none.</span></span></label><input type="text" class="form-control" id="s_middle_name" onblur="toProperCase(this)"></div>
+                    <div class="form-group"><label>Last Name * <span class="help-icon" tabindex="0">?<span class="tooltip-text">Student's legal last name. Auto-formatted to Proper Case.</span></span></label><input type="text" class="form-control" id="s_last_name" required onblur="toProperCase(this)"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Sex <span class="help-icon" tabindex="0">?<span class="tooltip-text">Select the student's sex at birth.</span></span></label><select class="form-select" id="s_gender"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+                    <div class="form-group"><label>Birth Date * <span class="help-icon" tabindex="0">?<span class="tooltip-text">Student's date of birth. Future dates not allowed.</span></span></label><input type="date" class="form-control" id="s_birthdate" onblur="validateBirthdate(this)"></div>
+                    <div class="form-group"><label>Contact Number <span class="help-icon" tabindex="0">?<span class="tooltip-text">Philippine mobile: +63 9123456789, 09123456789, or 9123456789.</span></span></label><input type="text" class="form-control" id="s_contact_number" placeholder="e.g. +63 9123456789" oninput="validateContactNumber(this)" onblur="formatContactNumber(this)"><small style="color:#64748b;font-size:11px">Philippine format: +63 9xxxxxxxxx or 09xxxxxxxxx</small></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Email Address <span class="help-icon" tabindex="0">?<span class="tooltip-text">Student's email (optional). Must be valid format with existing domain.</span></span></label><input type="email" class="form-control" id="s_email" onblur="validateEmailField(this)"></div>
+                    <div class="form-group"><label>Complete Address <span class="help-icon" tabindex="0">?<span class="tooltip-text">Complete home address: house no., street, barangay, city, province.</span></span></label><textarea class="form-control" id="s_address" rows="2"></textarea></div>
+                </div>
+                <div class="form-group"><label>Profile Picture <span class="help-icon" tabindex="0">?<span class="tooltip-text">Upload student photo. Accepted: JPG, JPEG, PNG only.</span></span></label><input type="file" class="form-control" id="s_photo" accept=".jpg,.jpeg,.png" onchange="validatePhoto(this)"></div>
+
+                <h4 style="margin:15px 0 10px;font-size:14px;color:var(--primary)">Parent/Guardian Information</h4>
+                <div class="form-row">
+                    <div class="form-group"><label>Parent/Guardian <span class="help-icon" tabindex="0">?<span class="tooltip-text">Select parent from list. Add parents first in Parents page if not listed.</span></span></label><select class="form-select" id="s_parent_id"><option value="">Select Parent</option></select></div>
+                    <div class="form-group"><label>Parent Contact # <span class="help-icon" tabindex="0">?<span class="tooltip-text">Parent's contact — auto-filled when parent selected above.</span></span></label><input type="text" class="form-control" id="s_parent_contact" readonly placeholder="Auto-filled from parent"></div>
+                </div>
+
+                <h4 style="margin:15px 0 10px;font-size:14px;color:var(--primary)">Academic Information</h4>
+                <div class="form-row">
+                    <div class="form-group"><label>Grade Level * <span class="help-icon" tabindex="0">?<span class="tooltip-text">Current grade level. Sections load based on this selection.</span></span></label><select class="form-select" id="s_grade_level" onchange="loadSections()"><option value="">Select</option><option>Grade 7</option><option>Grade 8</option><option>Grade 9</option><option>Grade 10</option><option>Grade 11</option><option>Grade 12</option></select></div>
+                    <div class="form-group"><label>Section * <span class="help-icon" tabindex="0">?<span class="tooltip-text">Select section/class. Only sections under selected grade level shown.</span></span></label><select class="form-select" id="s_section_id"><option value="">Select Grade First</option></select></div>
+                    <div class="form-group"><label>Status <span class="help-icon" tabindex="0">?<span class="tooltip-text">Active = enrolled. Inactive = not enrolled. Graduated/Transferred = no longer in school.</span></span></label><select class="form-select" id="s_status"><option value="Active">Active</option><option value="Inactive">Inactive</option><option value="Graduated">Graduated</option><option value="Transferred">Transferred</option></select></div>
+                </div>
+                <input type="hidden" id="s_id">
+                <div class="flex gap-10 mt-10">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-outline" onclick="closeStudentModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js?v=1"></script>
+    <script>
+        auth.requireAuth();
+        const _role = auth.getRole();
+        const _isAdmin = _role === 'Admin';
+        if (!_isAdmin && _role !== 'Teacher' && _role !== 'Adviser') { auth.redirectToDashboard(); }
+
+        function toProperCase(el) {
+            el.value = el.value.replace(/\w\S*/g, function(txt) {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            });
+        }
+
+        function validateContactNumber(el) {
+            const val = el.value.trim();
+            if (!val) { el.style.borderColor = ''; return true; }
+            const cleaned = val.replace(/[\s\-\(\)]/g, '');
+            const isValid = /^(?:\+63|0)?9\d{9}$/.test(cleaned);
+            if (!isValid) {
+                el.style.borderColor = 'red';
+                return false;
+            }
+            el.style.borderColor = '';
+            return true;
+        }
+
+        function formatContactNumber(el) {
+            let val = el.value.replace(/[^\d+]/g, '');
+            if (!val.startsWith('+') && val.length > 0) {
+                if (val.startsWith('63')) {
+                    val = '+' + val;
+                }
+            }
+            el.value = val;
+        }
+
+        function validateEmailField(el) {
+            const val = el.value.trim();
+            if (!val) return true;
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+            if (!re.test(val)) {
+                app.showAlert('Please enter a valid email address.', 'danger');
+                el.focus();
+                return false;
+            }
+            const domain = val.substring(val.indexOf('@') + 1);
+            if (!/\.([a-zA-Z]{2,})$/.test(domain)) {
+                app.showAlert('Please enter a valid email address.', 'danger');
+                el.focus();
+                return false;
+            }
+            return true;
+        }
+
+        function validateLRN(el) {
+            const val = el.value.trim();
+            if (!val) return true;
+            if (!/^\d+$/.test(val)) {
+                app.showAlert('LRN must contain numbers only.', 'danger');
+                el.focus();
+                return false;
+            }
+            if (val.length !== 12) {
+                app.showAlert('LRN must be exactly 12 digits.', 'danger');
+                el.focus();
+                return false;
+            }
+            return true;
+        }
+
+        function validateBirthdate(el) {
+            const val = el.value;
+            if (!val) return true;
+            const date = new Date(val);
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+            if (date > today) {
+                app.showAlert('Birth date must not be a future date.', 'danger');
+                el.value = '';
+                el.focus();
+                return false;
+            }
+            return true;
+        }
+
+        function validatePhoto(el) {
+            const file = el.files[0];
+            if (!file) return true;
+            const allowed = ['image/jpeg', 'image/png'];
+            if (!allowed.includes(file.type)) {
+                app.showAlert('Profile picture must be in JPG, JPEG, or PNG format only.', 'danger');
+                el.value = '';
+                return false;
+            }
+            return true;
+        }
+
+        document.getElementById('addStudentBtn').style.display = _isAdmin ? '' : 'none';
+
+        async function loadStudents() {
+            try {
+                const filters = { search: document.getElementById('searchStudent').value, status: document.getElementById('filterStatus').value };
+                const selSection = document.getElementById('filterSection').value;
+                const selGrade = document.getElementById('filterGrade').value;
+                if (selSection) {
+                    filters.section_id = selSection;
+                } else if (selGrade) {
+                    const r = await api.getSections();
+                    const gradeSections = (r.data || []).filter(s => s.grade_level === selGrade);
+                    const ids = [...new Set(gradeSections.map(s => s.section_id))];
+                    if (!_isAdmin) {
+                        const tsR = await api.get('/teacher-sections');
+                        const myIds = [...new Set((tsR.data || []).map(s => s.section_id))];
+                        const filtered = ids.filter(id => myIds.includes(id));
+                        if (filtered.length > 0) filters.section_id = filtered.join(',');
+                        else { document.getElementById('students-table').innerHTML = '<p style="text-align:center;padding:40px;color:var(--gray);">No students found.</p>'; return; }
+                    } else if (ids.length > 0) {
+                        filters.section_id = ids.join(',');
+                    }
+                } else if (!_isAdmin) {
+                    const tsR = await api.get('/teacher-sections');
+                    const sectionIds = [...new Set((tsR.data || []).map(s => s.section_id))];
+                    if (sectionIds.length > 0) filters.section_id = sectionIds.join(',');
+                    else { document.getElementById('students-table').innerHTML = '<p style="text-align:center;padding:40px;color:var(--gray);">No sections assigned to you.</p>'; return; }
+                }
+                const result = await api.getStudents(filters);
+                const students = result.data;
+
+                let html = `<div class="table-responsive"><table class="table"><thead><tr>
+                    <th>Photo</th><th>Student #</th><th>LRN</th><th>Name</th><th>Grade/Section</th><th>Parent</th><th>Barcode</th><th>Status</th><th>Actions</th>
+                </tr></thead><tbody>`;
+
+                students.forEach(s => {
+                    html += `<tr>
+                        <td>${s.photo ? `<img src="${s.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">` : `<div style="width:40px;height:40px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#64748b;font-size:14px;">${(s.first_name || '?')[0]}</div>`}</td>
+                        <td>${s.student_number}</td>
+                        <td>${s.lrn}</td>
+                        <td>${s.first_name} ${s.middle_name ? s.middle_name + ' ' : ''}${s.last_name}</td>
+                        <td>${s.grade_level || ''} ${s.section_name || ''}</td>
+                        <td>${s.parent_name || '-'}</td>
+                        <td>${s.barcode ? `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;" onclick="showBarcode('${s.barcode}', '${s.first_name} ${s.last_name}')"><img class="barcode-img" data-barcode="${s.barcode}" style="height:30px;background:#fff;border-radius:4px;padding:2px;border:1px solid #e2e8f0;"><span style="font-size:10px;color:var(--gray);font-family:monospace;">${s.barcode}</span></div>` : '-'}</td>
+                        <td>${app.statusBadge(s.status)}</td>
+                        <td class="flex gap-10">
+                            ${_isAdmin ? `<button class="btn btn-sm btn-primary" onclick="editStudent(${s.student_id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteStudent(${s.student_id})">Delete</button>` : ''}
+                        </td>
+                    </tr>`;
+                });
+
+                html += '</tbody></table></div>';
+                document.getElementById('students-table').innerHTML = html;
+                renderBarcodes();
+            } catch (err) {
+                document.getElementById('students-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+        }
+
+        function renderBarcodes() {
+            document.querySelectorAll('.barcode-img').forEach(img => {
+                const code = img.dataset.barcode;
+                if (!code || img.src) return;
+                try {
+                    const c = document.createElement('canvas');
+                    JsBarcode(c, code, { format: 'CODE128', width: 1.5, height: 28, displayValue: false });
+                    img.src = c.toDataURL();
+                } catch(_) { img.style.display = 'none'; }
+            });
+        }
+
+        function showBarcode(code, name) {
+            if (!code) return;
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `<div style="background:#fff;border-radius:12px;padding:30px;text-align:center;max-width:400px;">
+                <button onclick="this.closest('.modal-overlay').remove()" style="float:right;background:none;border:none;font-size:24px;cursor:pointer;color:var(--gray);">&times;</button>
+                <h3 style="margin:0 0 8px;">${name}</h3>
+                <canvas id="barcodePreview"></canvas>
+                <p style="color:var(--gray);font-size:13px;margin-top:8px;">Code: ${code}</p>
+            </div>`;
+            document.body.appendChild(overlay);
+            setTimeout(() => {
+                const cv = document.getElementById('barcodePreview');
+                if (cv) try { JsBarcode(cv, code, { format: 'CODE128', width: 2, height: 60, displayValue: true }); } catch(_) {}
+            }, 50);
+        }
+
+        async function generateBarcode(id) {
+            try {
+                const result = await api.generateBarcode(id);
+                app.showAlert(`Barcode: ${result.data.barcode}`);
+                loadStudents();
+            } catch (err) { app.showAlert(err.message, 'danger'); }
+        }
+
+        async function deleteStudent(id) {
+            if (!await app.confirmAction('Delete this student?')) return;
+            try { await api.deleteStudent(id); app.showAlert('Student deleted'); loadStudents(); }
+            catch (err) { app.showAlert(err.message, 'danger'); }
+        }
+
+        async function uploadPhoto(id) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.jpg,.jpeg,.png,.gif,.webp';
+            input.onchange = async function() {
+                const file = input.files[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) { app.showAlert('Photo must be under 5MB', 'danger'); return; }
+                const formData = new FormData();
+                formData.append('photo', file);
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const res = await fetch(`/api/students/${id}/photo`, {
+                        method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData
+                    });
+                    const result = await res.json();
+                    if (!res.ok) throw new Error(result.message || 'Upload failed');
+                    app.showAlert('Photo uploaded successfully', 'success');
+                } catch (err) { app.showAlert(err.message, 'danger'); }
+            };
+            input.click();
+        }
+
+        async function loadGradeFilter() {
+            const sel = document.getElementById('filterGrade');
+            try {
+                let sections;
+                if (_isAdmin) {
+                    const r = await api.getSections();
+                    sections = r.data || [];
+                } else {
+                    const tsR = await api.get('/teacher-sections');
+                    const seen = new Set();
+                    sections = (tsR.data || []).filter(s => {
+                        if (!s.section_id || seen.has(s.section_id)) return false;
+                        seen.add(s.section_id);
+                        return true;
+                    });
+                }
+                const grades = [...new Set(sections.map(s => s.grade_level).filter(Boolean))].sort();
+                sel.innerHTML = '<option value="">All Grades</option>' + grades.map(g => `<option value="${g}">${g}</option>`).join('');
+            } catch (_) {}
+        }
+
+        async function loadSectionFilter() {
+            const sel = document.getElementById('filterSection');
+            const grade = document.getElementById('filterGrade').value;
+            sel.innerHTML = '<option value="">All Sections</option>';
+            try {
+                let sections;
+                if (_isAdmin) {
+                    const r = await api.getSections();
+                    sections = r.data || [];
+                } else {
+                    const tsR = await api.get('/teacher-sections');
+                    const seen = new Set();
+                    sections = (tsR.data || []).filter(s => {
+                        if (!s.section_id || seen.has(s.section_id)) return false;
+                        seen.add(s.section_id);
+                        return true;
+                    });
+                    if (sections.length === 0) { sel.innerHTML = '<option value="">No sections assigned</option>'; return; }
+                }
+                if (grade) sections = sections.filter(s => s.grade_level === grade);
+                const seen = new Map();
+                sections.forEach(s => {
+                    const label = s.section_name;
+                    if (seen.has(label)) {
+                        seen.get(label).push(s.section_id);
+                        return;
+                    }
+                    seen.set(label, [s.section_id]);
+                });
+                seen.forEach((ids, label) => {
+                    sel.innerHTML += `<option value="${ids.join(',')}">${label}</option>`;
+                });
+            } catch (_) {}
+            loadStudents();
+        }
+
+        async function loadSections() {
+            try {
+                const grade = document.getElementById('s_grade_level').value;
+                const result = await api.getSections();
+                const sections = result.data.filter(s => s.grade_level === grade);
+                const sel = document.getElementById('s_section_id');
+                sel.innerHTML = '<option value="">Select Section</option>' + sections.map(s => `<option value="${s.section_id}">${s.section_name}</option>`).join('');
+            } catch (err) {}
+        }
+
+        async function loadParents() {
+            try {
+                const result = await api.getParents();
+                const parents = result.data;
+                const sel = document.getElementById('s_parent_id');
+                sel.innerHTML = '<option value="">Select Parent</option>' + parents.map(p => `<option value="${p.parent_id}" data-contact="${p.contact_number || ''}">${p.first_name} ${p.last_name}</option>`).join('');
+            } catch (err) {}
+        }
+
+        document.getElementById('s_parent_id').addEventListener('change', function() {
+            const selected = this.options[this.selectedIndex];
+            const contact = selected.getAttribute('data-contact') || '';
+            document.getElementById('s_parent_contact').value = contact;
+        });
+
+        async function editStudent(id) {
+            try {
+                const result = await api.getStudent(id);
+                const s = result.data;
+                document.getElementById('studentModalTitle').textContent = 'Edit Student';
+                document.getElementById('s_id').value = s.student_id;
+                document.getElementById('s_student_number').value = s.student_number;
+                document.getElementById('s_lrn').value = s.lrn;
+                document.getElementById('s_first_name').value = s.first_name;
+                document.getElementById('s_middle_name').value = s.middle_name || '';
+                document.getElementById('s_last_name').value = s.last_name;
+                document.getElementById('s_gender').value = s.gender || '';
+                document.getElementById('s_birthdate').value = s.birthdate || '';
+                document.getElementById('s_contact_number').value = s.contact_number || '';
+                document.getElementById('s_email').value = s.email || '';
+                document.getElementById('s_address').value = s.address || '';
+                document.getElementById('s_grade_level').value = s.grade_level || '';
+                document.getElementById('s_status').value = s.status;
+                document.getElementById('s_photo').value = '';
+                await loadSections();
+                document.getElementById('s_section_id').value = s.section_id || '';
+                document.getElementById('s_parent_id').value = s.parent_id || '';
+                if (s.parent_id) {
+                    document.getElementById('s_parent_contact').value = s.parent_contact || '';
+                }
+                showStudentModal();
+            } catch (err) { app.showAlert(err.message, 'danger'); }
+        }
+
+        function showAddStudent() {
+            document.getElementById('studentModalTitle').textContent = 'Add Student';
+            document.getElementById('studentForm').reset();
+            document.getElementById('s_id').value = '';
+            document.getElementById('s_photo').value = '';
+            showStudentModal();
+        }
+
+        function showStudentModal() { document.getElementById('studentModal').style.display = 'flex'; }
+        function closeStudentModal() { document.getElementById('studentModal').style.display = 'none'; }
+
+        document.getElementById('studentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Validate all fields
+            toProperCase(document.getElementById('s_first_name'));
+            toProperCase(document.getElementById('s_middle_name'));
+            toProperCase(document.getElementById('s_last_name'));
+
+            if (!validateLRN(document.getElementById('s_lrn'))) return;
+            const contactEl = document.getElementById('s_contact_number');
+            if (contactEl.value.trim() && !validateContactNumber(contactEl)) {
+                app.showAlert('Please enter a valid Philippine contact number (e.g. +63 9xxxxxxxxx or 09xxxxxxxxx).', 'danger');
+                return;
+            }
+            if (!validateEmailField(document.getElementById('s_email'))) return;
+            if (!validateBirthdate(document.getElementById('s_birthdate'))) return;
+            if (!validatePhoto(document.getElementById('s_photo'))) return;
+
+            const id = document.getElementById('s_id').value;
+            const sectionId = document.getElementById('s_section_id').value;
+            if (!sectionId) { app.showAlert('Please select a grade level and section.', 'danger'); return; }
+
+            const photoInput = document.getElementById('s_photo');
+            let photoFilename = '';
+
+            // For simplicity, just store the filename (actual file upload requires server handling)
+            if (photoInput.files.length > 0) {
+                photoFilename = photoInput.files[0].name;
+            }
+
+            const data = {
+                student_number: document.getElementById('s_student_number').value,
+                lrn: document.getElementById('s_lrn').value,
+                first_name: document.getElementById('s_first_name').value,
+                middle_name: document.getElementById('s_middle_name').value,
+                last_name: document.getElementById('s_last_name').value,
+                gender: document.getElementById('s_gender').value,
+                birthdate: document.getElementById('s_birthdate').value,
+                contact_number: document.getElementById('s_contact_number').value,
+                email: document.getElementById('s_email').value,
+                address: document.getElementById('s_address').value,
+                photo: photoFilename || undefined,
+                section_id: sectionId ? parseInt(sectionId) : null,
+                parent_id: document.getElementById('s_parent_id').value ? parseInt(document.getElementById('s_parent_id').value) : null,
+                status: document.getElementById('s_status').value,
+            };
+
+            try {
+                if (id) { await api.updateStudent(id, data); app.showFormAlert('Student updated successfully!', 'success'); }
+                else { await api.createStudent(data); app.showFormAlert('Student created successfully!', 'success'); }
+                setTimeout(() => { closeStudentModal(); loadStudents(); }, 1500);
+            } catch (err) { app.showFormAlert(err.message, 'danger'); }
+        });
+
+        loadGradeFilter();
+        loadSectionFilter();
+        loadParents();
+    </script>
+</body>
+</html>
+

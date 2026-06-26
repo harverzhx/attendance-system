@@ -1,0 +1,209 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parents - Gate Attendance System</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .parent-row:hover { background:#f8fafc; }
+    .contact-tag { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:#f0f9ff;color:#2563eb;border-radius:12px;font-size:12px; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="flex-between mb-20">
+    <div class="filter-bar">
+        <div class="form-group"><input type="search" class="form-control" id="searchParent" placeholder="Search name, email..." oninput="loadParents()"></div>
+        <button class="btn btn-primary" onclick="showAddParent()">+ Add Parent</button>
+    </div>
+</div>
+
+<div class="card">
+    <div id="parents-table"><div class="loading">Loading...</div></div>
+</div>
+</div>
+
+<div id="parentModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; padding:30px; width:500px; max-width:90%;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+            <h3 id="parentModalTitle" style="margin:0">Add Parent</h3>
+            <button type="button" onclick="closeParentModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;padding:0;line-height:1">&times;</button>
+        </div>
+        <div id="form-alert" style="display:none"></div>
+        <form id="parentForm">
+            <div class="form-row">
+                <div class="form-group"><label>First Name</label><input type="text" class="form-control" id="p_first_name" required onblur="toProperCase(this)"></div>
+                <div class="form-group"><label>Middle Name</label><input type="text" class="form-control" id="p_middle_name" onblur="toProperCase(this)"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Last Name</label><input type="text" class="form-control" id="p_last_name" required onblur="toProperCase(this)"></div>
+                <div class="form-group"><label>Contact #</label><input type="text" class="form-control" id="p_contact" placeholder="e.g. +63 9123456789" oninput="validateContactNumber(this)" onblur="formatContactNumber(this)"></div>
+            </div>
+            <div class="form-group"><label>Email</label><input type="email" class="form-control" id="p_email" required onblur="validateEmailField(this)"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Relationship</label><select class="form-select" id="p_relationship"><option value="Parent">Parent</option><option value="Guardian">Guardian</option><option value="Relative">Relative</option></select></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Username</label><input type="text" class="form-control" id="p_username" required></div>
+                <div class="form-group"><label>Password</label><input type="password" class="form-control" id="p_password"></div>
+            </div>
+            <input type="hidden" id="p_id">
+            <div class="flex gap-10 mt-10">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-outline" onclick="closeParentModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+function toProperCase(el) {
+    el.value = el.value.replace(/\w\S*/g, function(txt) {
+        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    });
+}
+
+function validateContactNumber(el) {
+    const val = el.value.trim();
+    if (!val) { el.style.borderColor = ''; return true; }
+    const cleaned = val.replace(/[\s\-\(\)]/g, '');
+    const isValid = /^(?:\+63|0)?9\d{9}$/.test(cleaned);
+    el.style.borderColor = isValid ? '' : 'red';
+    return isValid;
+}
+
+function formatContactNumber(el) {
+    let val = el.value.replace(/[^\d+]/g, '');
+    if (!val.startsWith('+') && val.length > 0 && val.startsWith('63')) {
+        val = '+' + val;
+    }
+    el.value = val;
+}
+
+function validateEmailField(el) {
+    const val = el.value.trim();
+    if (!val) return true;
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!re.test(val)) { app.showAlert('Please enter a valid email address.', 'danger'); el.focus(); return false; }
+    return true;
+}
+
+async function loadParents() {
+    try {
+        const result = await api.getParents();
+        const parents = result.data || [];
+        const search = document.getElementById('searchParent').value.toLowerCase();
+        const filtered = parents.filter(p =>
+            (p.first_name + ' ' + p.last_name + p.email + (p.contact_number || '')).toLowerCase().includes(search)
+        );
+
+        let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th>Name</th><th>Email</th><th>Contact</th><th>Children</th><th>Relationship</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody>`;
+
+        if (filtered.length === 0) {
+            html += '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray);">No parents found.</td></tr>';
+        }
+
+        filtered.forEach(p => {
+            const contactDisplay = p.contact_number ? `<span class="contact-tag">📞 ${p.contact_number}</span>` : '-';
+            html += `<tr class="parent-row">
+                <td><strong>${p.first_name} ${p.last_name}</strong></td>
+                <td>${p.email}</td>
+                <td>${contactDisplay}</td>
+                <td><span class="badge badge-info">${p.student_count || 0} child(ren)</span></td>
+                <td>${p.relationship || 'Parent'}</td>
+                <td>${app.statusBadge(p.status)}</td>
+                <td class="flex gap-10">
+                    <button class="btn btn-sm btn-primary" onclick="editParent(${p.parent_id})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteParent(${p.parent_id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        if (filtered.length > 0) {
+            html += `<div style="font-size:12px;color:var(--gray);padding:8px 16px;text-align:right;">Showing ${filtered.length} of ${parents.length} parents</div>`;
+        }
+        document.getElementById('parents-table').innerHTML = html;
+    } catch (err) {
+        document.getElementById('parents-table').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function editParent(id) {
+    try {
+        const result = await api.getParent(id);
+        const p = result.data;
+        document.getElementById('parentModalTitle').textContent = 'Edit Parent';
+        document.getElementById('p_id').value = p.parent_id;
+        document.getElementById('p_first_name').value = p.first_name;
+        document.getElementById('p_middle_name').value = p.middle_name || '';
+        document.getElementById('p_last_name').value = p.last_name;
+        document.getElementById('p_email').value = p.email;
+        document.getElementById('p_contact').value = p.contact_number || '';
+        document.getElementById('p_relationship').value = p.relationship || 'Parent';
+        document.getElementById('p_username').value = p.username;
+        document.getElementById('p_password').required = false;
+        showParentModal();
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+function showAddParent() {
+    document.getElementById('parentModalTitle').textContent = 'Add Parent';
+    document.getElementById('parentForm').reset();
+    document.getElementById('p_id').value = '';
+    document.getElementById('p_password').required = true;
+    showParentModal();
+}
+
+function showParentModal() { document.getElementById('parentModal').style.display = 'flex'; }
+function closeParentModal() { document.getElementById('parentModal').style.display = 'none'; }
+
+async function deleteParent(id) {
+    if (!await app.confirmAction('Delete this parent?')) return;
+    try { await api.deleteParent(id); app.showAlert('Parent deleted'); loadParents(); }
+    catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+document.getElementById('parentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    toProperCase(document.getElementById('p_first_name'));
+    toProperCase(document.getElementById('p_middle_name'));
+    toProperCase(document.getElementById('p_last_name'));
+    const contactEl = document.getElementById('p_contact');
+    if (contactEl.value.trim() && !validateContactNumber(contactEl)) {
+        app.showAlert('Please enter a valid Philippine contact number.', 'danger');
+        return;
+    }
+    if (!validateEmailField(document.getElementById('p_email'))) return;
+
+    const id = document.getElementById('p_id').value;
+    const data = {
+        first_name: document.getElementById('p_first_name').value,
+        middle_name: document.getElementById('p_middle_name').value,
+        last_name: document.getElementById('p_last_name').value,
+        email: document.getElementById('p_email').value,
+        contact_number: document.getElementById('p_contact').value,
+        relationship: document.getElementById('p_relationship').value,
+        username: document.getElementById('p_username').value,
+    };
+    const pw = document.getElementById('p_password').value;
+    if (pw) data.password = pw;
+
+    try {
+        if (id) { await api.updateParent(id, data); app.showFormAlert('Parent updated!', 'success'); }
+        else { await api.createParent(data); app.showFormAlert('Parent created!', 'success'); }
+        setTimeout(() => { closeParentModal(); loadParents(); }, 1500);
+    } catch (err) { app.showFormAlert(err.message, 'danger'); }
+});
+
+loadParents();
+</script>
+</body></html>
+

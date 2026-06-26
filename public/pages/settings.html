@@ -1,0 +1,218 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings - Gate Attendance System</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .setting-card { border:1px solid var(--border); border-radius:12px; padding:20px; background:#fff; }
+    .setting-card h3 { margin:0 0 16px; font-size:16px; display:flex; align-items:center; gap:8px; }
+    .save-status { font-size:12px; color:var(--success); display:none; }
+    .test-result { font-size:13px; margin-top:8px; padding:8px 12px; border-radius:6px; display:none; }
+    .test-result.success { display:block; background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+    .test-result.fail { display:block; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="grid-2">
+
+<div class="setting-card">
+    <h3>🏫 School Information</h3>
+    <form id="schoolForm">
+        <div class="form-group"><label>School Name</label><input type="text" class="form-control" id="set_school_name"></div>
+        <div class="form-group"><label>School Address</label><textarea class="form-control" id="set_school_address" rows="2"></textarea></div>
+        <div class="form-group"><label>School Year</label><input type="text" class="form-control" id="set_school_year"></div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <span class="save-status" id="schoolStatus">✓ Saved</span>
+    </form>
+</div>
+
+<div class="setting-card">
+    <h3>⏰ Attendance Rules</h3>
+    <form id="attendanceForm">
+        <div class="form-group"><label>School Start Time</label><input type="time" class="form-control" id="set_start_time"></div>
+        <div class="form-group"><label>Grace Period (minutes)</label><input type="number" class="form-control" id="set_grace_period"></div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <span class="save-status" id="attStatus">✓ Saved</span>
+    </form>
+</div>
+
+<div class="setting-card">
+    <h3>🏷️ Barcode Prefix</h3>
+    <form id="barcodeForm">
+        <div class="form-group"><label>Prefix</label><input type="text" class="form-control" id="set_barcode_prefix" placeholder="e.g. INS-A-"></div>
+        <p style="color:var(--gray);font-size:13px;margin-top:-8px">Format: <code>{prefix}{00001}</code> — e.g. <code>INS-A-00001</code></p>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <span class="save-status" id="barStatus">✓ Saved</span>
+    </form>
+</div>
+
+<div class="setting-card">
+    <h3>📝 Registration</h3>
+    <form id="registrationForm">
+        <label class="flex-center" style="justify-content:flex-start;gap:10px;margin-bottom:16px;">
+            <input type="checkbox" id="set_registration_enabled" style="width:20px;height:20px;">
+            <span>Enable Public Registration</span>
+        </label>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <span class="save-status" id="regStatus">✓ Saved</span>
+    </form>
+</div>
+
+<div class="setting-card" style="grid-column:1/-1;">
+    <h3>📧 Email (SMTP)</h3>
+    <form id="emailForm">
+        <div class="form-row">
+            <div class="form-group"><label>SMTP Host</label><input type="text" class="form-control" id="set_smtp_host"></div>
+            <div class="form-group"><label>Port</label><input type="number" class="form-control" id="set_smtp_port"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Username</label><input type="text" class="form-control" id="set_smtp_username" placeholder="harverzhx@gmail.com"></div>
+            <div class="form-group">
+                <label>Password</label>
+                <div style="position:relative">
+                    <input type="password" class="form-control" id="set_smtp_password" placeholder="Gmail App Password" style="padding-right:50px;">
+                    <span class="toggle-pw" data-target="set_smtp_password" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:13px;color:#64748b;user-select:none;">Show</span>
+                </div>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>From Email</label><input type="email" class="form-control" id="set_smtp_from_email" placeholder="noreply@school.edu"></div>
+            <div class="form-group"><label class="flex-center" style="justify-content:flex-start;gap:10px;margin-top:24px;"><input type="checkbox" id="set_email_enabled" style="width:20px;height:20px;"> Email Enabled</label></div>
+        </div>
+        <div class="flex gap-10">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn btn-info" onclick="testEmail()">📧 Test Email</button>
+            <span class="save-status" id="emailStatus">✓ Saved</span>
+        </div>
+        <div id="testResult" class="test-result"></div>
+    </form>
+</div>
+
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+// Password toggle
+document.querySelectorAll('.toggle-pw').forEach(el => {
+    el.onclick = function() {
+        const inp = document.getElementById(this.dataset.target);
+        const isPass = inp.type === 'password';
+        inp.type = isPass ? 'text' : 'password';
+        this.textContent = isPass ? 'Hide' : 'Show';
+    };
+});
+
+async function loadSettings() {
+    try {
+        const result = await api.getSettings();
+        const s = result.data;
+        if (!s) return;
+        document.getElementById('set_school_name').value = s.school_name || '';
+        document.getElementById('set_school_address').value = s.school_address || '';
+        document.getElementById('set_school_year').value = s.school_year || '';
+        document.getElementById('set_start_time').value = s.school_start_time || '';
+        document.getElementById('set_grace_period').value = s.grace_period_minutes || 10;
+        document.getElementById('set_registration_enabled').checked = s.registration_enabled === 't' || s.registration_enabled === true;
+        document.getElementById('set_email_enabled').checked = s.email_notification_enabled === 't' || s.email_notification_enabled === true;
+        document.getElementById('set_smtp_host').value = s.smtp_host || '';
+        document.getElementById('set_smtp_port').value = s.smtp_port || 587;
+        document.getElementById('set_smtp_username').value = s.smtp_username || '';
+        document.getElementById('set_smtp_from_email').value = s.smtp_from_email || '';
+        document.getElementById('set_barcode_prefix').value = s.barcode_prefix || '';
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+function showStatus(id) {
+    const el = document.getElementById(id);
+    el.style.display = 'inline';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+document.getElementById('schoolForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await api.updateSettings({
+            school_name: document.getElementById('set_school_name').value,
+            school_address: document.getElementById('set_school_address').value,
+            school_year: document.getElementById('set_school_year').value,
+        });
+        showStatus('schoolStatus');
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+});
+
+document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await api.updateSettings({
+            school_start_time: document.getElementById('set_start_time').value,
+            grace_period_minutes: parseInt(document.getElementById('set_grace_period').value),
+        });
+        showStatus('attStatus');
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+});
+
+document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await api.updateSettings({ registration_enabled: document.getElementById('set_registration_enabled').checked });
+        showStatus('regStatus');
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+});
+
+document.getElementById('barcodeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await api.updateSettings({ barcode_prefix: document.getElementById('set_barcode_prefix').value });
+        showStatus('barStatus');
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+});
+
+document.getElementById('emailForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await api.updateSettings({
+            smtp_host: document.getElementById('set_smtp_host').value,
+            smtp_port: parseInt(document.getElementById('set_smtp_port').value),
+            smtp_username: document.getElementById('set_smtp_username').value,
+            smtp_password: document.getElementById('set_smtp_password').value,
+            smtp_from_email: document.getElementById('set_smtp_from_email').value,
+            email_notification_enabled: document.getElementById('set_email_enabled').checked,
+        });
+        showStatus('emailStatus');
+    } catch (err) { app.showAlert(err.message, 'danger'); }
+});
+
+async function testEmail() {
+    const el = document.getElementById('testResult');
+    el.className = 'test-result';
+    el.textContent = 'Sending test email...';
+    el.style.display = 'block';
+    try {
+        const r = await api.post('/settings/test-email', {
+            host: document.getElementById('set_smtp_host').value,
+            port: parseInt(document.getElementById('set_smtp_port').value),
+            username: document.getElementById('set_smtp_username').value,
+            password: document.getElementById('set_smtp_password').value,
+            from_email: document.getElementById('set_smtp_from_email').value,
+        });
+        el.className = 'test-result success';
+        el.textContent = r.message || 'Test email sent successfully!';
+    } catch (err) {
+        el.className = 'test-result fail';
+        el.textContent = 'Failed: ' + (err.message || 'Unknown error');
+    }
+}
+
+loadSettings();
+</script>
+</body></html>
+

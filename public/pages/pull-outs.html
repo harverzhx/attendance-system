@@ -1,0 +1,104 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pull-Out Management</title><link rel="stylesheet" href="/css/style.css">
+<style>
+    .po-card { padding:16px; border:1px solid var(--border); border-radius:8px; margin-bottom:12px; }
+    .po-card:hover { background:#f8fafc; }
+    .po-photo { width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:12px; vertical-align:middle; }
+    .badge-out { background:#fef2f2;color:#dc2626; }
+    .badge-returned { background:#f0fdf4;color:#16a34a; }
+    .timeline { position:relative; padding-left:20px; border-left:2px solid var(--border); margin:8px 0; }
+    .timeline-item { position:relative; padding:4px 0 4px 12px; font-size:13px; }
+    .timeline-item::before { content:''; position:absolute; left:-7px; top:8px; width:10px; height:10px; border-radius:50%; background:var(--primary); }
+</style>
+</head><body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main-content">
+<div class="topbar" id="topbar"></div>
+<div id="alert-container"></div>
+
+<div class="filter-bar">
+    <div class="form-group"><label>Status</label><select class="form-select" id="statusFilter"><option value="">All</option><option value="Out">Out</option><option value="Returned">Returned</option></select></div>
+    <div class="form-group"><label>Date</label><input type="date" class="form-control" id="dateFilter"></div>
+    <button class="btn btn-primary" onclick="loadPullOuts()">Filter</button>
+    <button class="btn btn-outline" onclick="document.getElementById('dateFilter').value='';document.getElementById('statusFilter').value='';loadPullOuts()">Reset</button>
+</div>
+
+<div class="card">
+    <div class="card-header flex-between">
+        <span>Pull-Out Records (Parent Pickup)</span>
+        <span id="countBadge" style="font-size:14px;"></span>
+    </div>
+    <div id="poList"><p style="text-align:center;padding:40px;color:var(--gray);">Loading...</p></div>
+</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/app.js?v=1"></script>
+<script>
+auth.requireAuth();
+
+async function loadPullOuts() {
+    try {
+        const filters = {};
+        const s = document.getElementById('statusFilter').value;
+        const d = document.getElementById('dateFilter').value;
+        if (s) filters.status = s;
+        if (d) filters.date = d;
+
+        const r = await api.get('/pull-outs?' + new URLSearchParams(filters));
+        const data = r.data || [];
+        document.getElementById('countBadge').textContent = `${data.length} record(s)`;
+
+        if (data.length === 0) {
+            document.getElementById('poList').innerHTML = '<p style="text-align:center;padding:40px;color:var(--gray);">No pull-out records found.</p>';
+            return;
+        }
+
+        let html = '';
+        data.forEach(po => {
+            const isOut = po.status === 'Out';
+            html += `<div class="po-card" id="po-${po.pull_out_id}">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div style="display:flex;align-items:center;">
+                        ${po.student_photo ? `<img src="${po.student_photo}" class="po-photo">` : `<div class="po-photo" style="background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#64748b;">${(po.student_name || '?')[0]}</div>`}
+                        <div>
+                            <strong>${po.student_name}</strong><br>
+                            <small style="color:var(--gray);">${po.student_number || ''} · ${po.grade_level || ''} ${po.section_name || ''}</small>
+                        </div>
+                    </div>
+                    <span class="badge ${isOut ? 'badge-out' : 'badge-returned'}">${po.status}</span>
+                </div>
+                <div class="timeline">
+                    <div class="timeline-item"><strong>Pulled Out:</strong> ${app.formatDateTime(po.time_pulled)}</div>
+                    <div class="timeline-item"><strong>By:</strong> ${po.picked_up_by}${po.relationship ? ' (' + po.relationship + ')' : ''}</div>
+                    ${po.purpose ? `<div class="timeline-item"><strong>Purpose:</strong> ${po.purpose}</div>` : ''}
+                    ${po.time_returned ? `<div class="timeline-item"><strong>Returned:</strong> ${app.formatDateTime(po.time_returned)}</div>` : ''}
+                    ${po.remarks ? `<div class="timeline-item"><strong>Remarks:</strong> ${po.remarks}</div>` : ''}
+                </div>
+                ${isOut ? `<button class="btn btn-success btn-sm" onclick="markReturned(${po.pull_out_id})">✓ Mark Returned</button>` : ''}
+            </div>`;
+        });
+        document.getElementById('poList').innerHTML = html;
+    } catch (err) {
+        document.getElementById('poList').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+
+async function markReturned(id) {
+    if (!confirm('Mark this student as returned to campus?')) return;
+    try {
+        await api.post(`/pull-outs/${id}/return`);
+        app.showAlert('Student marked as returned', 'success');
+        loadPullOuts();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
+}
+
+document.getElementById('dateFilter').value = app.localDate();
+loadPullOuts();
+</script>
+</body></html>
+

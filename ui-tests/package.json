@@ -1,0 +1,15 @@
+{
+  "name": "gate-attendance-ui-tests",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "npx playwright test --reporter=list",
+    "test-headed": "cross-env HEADED=true npx playwright test --headed --reporter=list",
+    "report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  },
+  "dependencies": {
+    "cross-env": "^10.1.0"
+  }
+}
