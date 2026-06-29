@@ -1,8 +1,10 @@
 <?php
 date_default_timezone_set('Asia/Manila');
 
-$uri = $_SERVER['REQUEST_URI'];
-$path = parse_url($uri, PHP_URL_PATH);
+// For Caddy/FrankenPHP: original path passed via ?p= query param
+// For dev router.php: use REQUEST_URI directly
+$originalPath = $_GET['p'] ?? $_SERVER['REQUEST_URI'] ?? '/';
+$path = parse_url($originalPath, PHP_URL_PATH);
 
 // API routes -> simple_api.php
 if (preg_match('#^/api/#', $path)) {

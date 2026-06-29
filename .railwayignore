@@ -1,0 +1,5 @@
+vendor/
+node_modules/
+.git/
+backups/
+ui-tests/node_modules/
