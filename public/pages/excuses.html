@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><link rel="icon" href="/img/LogoINSH.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Excuse Slips</title><link rel="stylesheet" href="/css/style.css">
 <style>
     .excuse-card { padding:16px; border:1px solid var(--border); border-radius:8px; margin-bottom:12px; }
@@ -30,7 +30,7 @@
         <span>Excuse Slips</span>
         <span id="countBadge" style="font-size:14px;"></span>
     </div>
-    <div id="excuseList"><p style="text-align:center;padding:40px;color:var(--gray);">Loading...</p></div>
+    <div id="excuseList"><div class="loading">Loading...</div></div>
 </div>
 </div>
 
@@ -109,13 +109,13 @@ async function loadExcuses() {
 }
 
 async function teacherApprove(id) {
-    if (!confirm('Approve this excuse as Teacher?')) return;
+    if (!await app.confirmAction('Approve this excuse as Teacher?')) return;
     try { await api.post(`/excuses/${id}/teacher-approve`); app.showAlert('Excuse approved by teacher', 'success'); loadExcuses(); }
     catch (err) { app.showAlert(err.message, 'danger'); }
 }
 
 async function finalApprove(id) {
-    if (!confirm('Final approve this excuse?')) return;
+    if (!await app.confirmAction('Final approve this excuse?')) return;
     try { await api.post(`/excuses/${id}/approve`); app.showAlert('Excuse fully approved', 'success'); loadExcuses(); }
     catch (err) { app.showAlert(err.message, 'danger'); }
 }
@@ -128,7 +128,7 @@ async function rejectExcuse(id) {
 }
 
 async function deleteExcuse(id) {
-    if (!confirm('Delete this excuse record permanently?')) return;
+    if (!await app.confirmAction('Delete this excuse record permanently?')) return;
     try { await api.del(`/excuses/${id}`); app.showAlert('Excuse deleted', 'info'); loadExcuses(); }
     catch (err) { app.showAlert(err.message, 'danger'); }
 }

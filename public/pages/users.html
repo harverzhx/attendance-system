@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><link rel="icon" href="/img/LogoINSH.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Users - Gate Attendance System</title><link rel="stylesheet" href="/css/style.css">
 <style>
     .role-badge { display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600; }
@@ -20,6 +20,7 @@
         <div class="form-group"><input type="search" class="form-control" id="searchUser" placeholder="Search name, username, email..." oninput="loadUsers()"></div>
         <div class="form-group"><select class="form-select" id="filterRole" onchange="loadUsers()"><option value="">All Roles</option><option value="Admin">Admin</option><option value="Teacher">Teacher</option><option value="Adviser">Adviser</option><option value="Staff">Staff</option><option value="Viewer">Viewer</option></select></div>
         <button class="btn btn-primary" onclick="showAddUserModal()">+ Add User</button>
+        <button class="btn btn-danger" id="deleteSelectedBtn" onclick="deleteSelected()" style="display:none">Delete Selected</button>
     </div>
 </div>
 
@@ -154,15 +155,17 @@ async function loadUsers() {
         });
 
         let html = `<div class="table-responsive"><table class="table"><thead><tr>
+            <th style="width:40px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
             <th>Name</th><th>Employee ID</th><th>Username</th><th>Email</th><th>Contact</th><th>Specialization</th><th>Role</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody>`;
 
         if (filtered.length === 0) {
-            html += '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray);">No users found.</td></tr>';
+            html += '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray);">No users found.</td></tr>';
         }
 
         filtered.forEach(u => {
             html += `<tr>
+                <td><input type="checkbox" class="user-checkbox" value="${u.user_id}" onchange="updateDeleteBtn()"></td>
                 <td><strong>${u.first_name} ${u.last_name}</strong></td>
                 <td><code style="background:#f0f0f0;padding:1px 6px;border-radius:4px;font-size:13px;">${u.employee_id || '-'}</code></td>
                 <td><code style="background:#f0f0f0;padding:1px 6px;border-radius:4px;font-size:13px;">${u.username}</code></td>
@@ -205,6 +208,31 @@ async function deleteUser(id) {
     if (!await app.confirmAction('Delete this user?')) return;
     try { await api.deleteUser(id); app.showAlert('User deleted'); loadUsers(); }
     catch (err) { app.showAlert(err.message, 'danger'); }
+}
+
+function toggleSelectAll(src) {
+    document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = src.checked);
+    updateDeleteBtn();
+}
+
+function updateDeleteBtn() {
+    const checked = document.querySelectorAll('.user-checkbox:checked').length;
+    const btn = document.getElementById('deleteSelectedBtn');
+    btn.style.display = checked > 0 ? 'inline-flex' : 'none';
+    btn.textContent = `Delete Selected (${checked})`;
+}
+
+async function deleteSelected() {
+    const ids = [...document.querySelectorAll('.user-checkbox:checked')].map(cb => parseInt(cb.value));
+    if (ids.length === 0) return;
+    if (!await app.confirmAction(`Delete ${ids.length} user(s)?`)) return;
+    try {
+        await api.deleteUsers(ids);
+        app.showAlert(`${ids.length} user(s) deleted`);
+        loadUsers();
+    } catch (err) {
+        app.showAlert(err.message, 'danger');
+    }
 }
 
 function toggleSpecializationField() {

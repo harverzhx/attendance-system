@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="/img/LogoINSH.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Gate Attendance System</title>
     <link rel="stylesheet" href="/css/style.css">
@@ -131,6 +132,13 @@
                     const d = res.data;
                     if (!d) return;
                     renderStatCards(d);
+                    // Pending registrations count
+                    api.get('/registrations/pending').then(r => {
+                        const count = r.data ? (r.data.length || r.data.count || 0) : 0;
+                        const el = document.querySelector('.stat-card.pending-reg');
+
+                        if (el) { el.querySelector('.stat-value').textContent = count; }
+                    }).catch(() => {});
                     renderLiveFeed(d.recent_scans || []);
                     renderInsideOutside(d.gate);
                     renderExitTypes(d.exit_type_summary || []);
@@ -283,6 +291,7 @@
                 <div class="card stat-card success" onclick="window.location='/pages/scan-logs.html?scan_type=ENTRY'"><div class="stat-icon">🏫</div><div class="stat-value">${g.students_inside}</div><div class="stat-label">Inside Campus</div></div>
                 <div class="card stat-card secondary" onclick="window.location='/pages/scan-logs.html?scan_type=EXIT'"><div class="stat-icon">🏠</div><div class="stat-value">${g.students_outside}</div><div class="stat-label">Outside Campus</div></div>
                 <div class="card stat-card danger" onclick="window.location='/pages/scan-logs.html'"><div class="stat-icon">⏳</div><div class="stat-value">${g.students_not_yet_entered || 0}</div><div class="stat-label">Not Yet Entered</div></div>
+                <div class="card stat-card warning pending-reg" onclick="window.location='/pages/registrations.html'"><div class="stat-icon">📝</div><div class="stat-value">...</div><div class="stat-label">Pending Registrations</div></div>
                 <div class="card stat-card info" onclick="window.location='/pages/scan-logs.html?scan_type=ENTRY'"><div class="stat-icon">📥</div><div class="stat-value">${g.today_entries}</div><div class="stat-label">Entries Today</div></div>
                 <div class="card stat-card warning" onclick="window.location='/pages/scan-logs.html?scan_type=EXIT'"><div class="stat-icon">📤</div><div class="stat-value">${g.today_exits}</div><div class="stat-label">Exits Today</div></div>
             `;

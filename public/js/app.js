@@ -3,6 +3,12 @@ const app = {
     currentData: null,
 
     init() {
+        // Favicon
+        const favicon = document.querySelector('link[rel="icon"]') || document.createElement('link');
+        favicon.rel = 'icon';
+        favicon.href = '/img/LogoINSH.png';
+        if (!favicon.parentNode) document.head.appendChild(favicon);
+
         document.addEventListener('DOMContentLoaded', () => {
             this.initSidebar();
             this.initTopbar();
@@ -31,16 +37,29 @@ const app = {
             }, 200);
         });
 
-        // Watch for dynamically loaded tables to cardify them (mobile only, debounced)
-        if (window.innerWidth <= 768) {
-            let mobDebounce;
-            const mobObserver = new MutationObserver(() => {
-                clearTimeout(mobDebounce);
-                mobDebounce = setTimeout(() => this.cardifyTables(), 300);
-            });
-            mobObserver.observe(document.body, { childList: true, subtree: true });
-            setTimeout(() => mobObserver.disconnect(), 30000);
-        }
+        // Back-to-top button
+        this.initBackToTop();
+
+        // Floating action button
+        this.initFab();
+
+        // Keyboard shortcuts
+        this.initShortcuts();
+
+        // Auto-init tables (sortable, pagination)
+        setTimeout(() => this.initTables(), 100);
+
+        // Watch for dynamically loaded tables (debounced)
+        let tableTimer;
+        const tableObserver = new MutationObserver(() => {
+            clearTimeout(tableTimer);
+            tableTimer = setTimeout(() => {
+                this.initTables();
+                if (window.innerWidth <= 768) this.cardifyTables();
+            }, 300);
+        });
+        tableObserver.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => tableObserver.disconnect(), 30000);
     },
 
     cardifyTables() {
@@ -61,6 +80,13 @@ const app = {
                 });
             });
             table.dataset.cardified = '1';
+        });
+    },
+
+    initTables() {
+        document.querySelectorAll('table.table').forEach(table => {
+            this.makeSortable(table);
+            this.paginateTable(table, 25);
         });
     },
 
@@ -134,8 +160,13 @@ const app = {
         const currentPath = window.location.pathname;
 
         let html = `<div class="sidebar-header">
-            <h3>🏫 Gate Attendance</h3>
-            <small>${role || ''}</small>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <img src="/img/LogoINSH.png" alt="Logo" style="width:38px;height:38px;border-radius:6px;object-fit:contain;">
+                <div>
+                    <h3 style="margin:0;font-size:15px;line-height:1.2;">Ilaya NHS</h3>
+                    <small>${role || ''}</small>
+                </div>
+            </div>
         </div><div class="sidebar-menu">`;
 
         items.forEach(item => {
@@ -148,10 +179,25 @@ const app = {
         });
 
         html += `<div class="menu-label" style="margin-top:20px">Account</div>
+            <a href="#" id="darkModeToggle"><span>🌙</span> Dark Mode</a>
             <a href="#" onclick="auth.logout()"><span>🚪</span> Logout</a>
         </div>`;
 
         sidebar.innerHTML = html;
+
+        // Dark mode toggle
+        const dmBtn = document.getElementById('darkModeToggle');
+        if (dmBtn) {
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            if (isDark) document.body.classList.add('dark-mode');
+            dmBtn.innerHTML = isDark ? '<span>☀️</span> Light Mode' : '<span>🌙</span> Dark Mode';
+            dmBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const on = document.body.classList.toggle('dark-mode');
+                localStorage.setItem('darkMode', on);
+                dmBtn.innerHTML = on ? '<span>☀️</span> Light Mode' : '<span>🌙</span> Dark Mode';
+            });
+        }
 
         // Mobile bottom navigation
         this.initBottomNav(items);
@@ -202,6 +248,14 @@ const app = {
                 <button class="btn btn-outline btn-sm" onclick="auth.logout()">Logout</button>
             </div>
         `;
+
+        // Insert breadcrumbs container after topbar
+        let crumbs = document.getElementById('breadcrumbs');
+        if (!crumbs) {
+            crumbs = document.createElement('div');
+            crumbs.id = 'breadcrumbs';
+            topbar.parentNode.insertBefore(crumbs, topbar.nextSibling);
+        }
     },
 
     toggleSidebar() {
@@ -219,6 +273,171 @@ const app = {
         })();
         const isOpen = sidebar.classList.toggle('open');
         backdrop.classList.toggle('open', isOpen);
+    },
+
+    initBackToTop() {
+        const btn = document.createElement('button');
+        btn.id = 'back-to-top';
+        btn.innerHTML = '&#8593;';
+        btn.setAttribute('aria-label', 'Back to top');
+        btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+        document.body.appendChild(btn);
+        let ticking = false;
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    btn.classList.toggle('visible', window.scrollY > 300);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }, { passive: true });
+        // Check initial state
+        if (window.scrollY > 300) btn.classList.add('visible');
+    },
+
+    initFab() {
+        const role = auth.getRole();
+        const actions = {
+            Admin: [
+                { icon: '🎓', text: 'Add Student', href: '/pages/students.html#add' },
+                { icon: '👥', text: 'Add User', href: '/pages/users.html#add' },
+                { icon: '📝', text: 'Approve Registration', href: '/pages/registrations.html' },
+                { icon: '📚', text: 'New Section', href: '/pages/sections.html#add' },
+                { icon: '📟', text: 'Scan Entry/Exit', href: '/pages/scanner.html' },
+            ],
+            Teacher: [
+                { icon: '📝', text: 'Mark Attendance', href: '/pages/class-attendance.html' },
+                { icon: '🎓', text: 'My Students', href: '/pages/students.html' },
+                { icon: '🚪', text: 'Create Pull-Out', href: '/pages/pull-outs.html#add' },
+            ],
+            Adviser: [
+                { icon: '📝', text: 'Mark Attendance', href: '/pages/class-attendance.html' },
+                { icon: '🎓', text: 'My Students', href: '/pages/students.html' },
+                { icon: '📜', text: 'Excuse Slips', href: '/pages/excuses.html' },
+            ],
+            Staff: [
+                { icon: '📟', text: 'Scan Entry/Exit', href: '/pages/scanner.html' },
+            ],
+            Parent: [
+                { icon: '📝', text: 'Submit Excuse', href: '/pages/parent-excuse.html' },
+                { icon: '📋', text: 'View Attendance', href: '/pages/parent-attendance.html' },
+            ],
+        };
+        const items = actions[role] || [];
+        if (!items.length) return;
+
+        // Overlay
+        let overlay = document.getElementById('fab-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'fab-overlay';
+            document.body.appendChild(overlay);
+        }
+
+        // Menu
+        let menu = document.getElementById('fab-menu');
+        if (!menu) {
+            menu = document.createElement('div');
+            menu.id = 'fab-menu';
+            document.body.appendChild(menu);
+        }
+        menu.innerHTML = items.map(a =>
+            `<a class="fab-item" href="${a.href}"><span>${a.icon}</span> ${a.text}</a>`
+        ).join('');
+
+        // Button
+        let btn = document.getElementById('fab');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'fab';
+            btn.setAttribute('aria-label', 'Quick actions');
+            document.body.appendChild(btn);
+        }
+        btn.textContent = '+';
+
+        const toggle = () => {
+            const open = btn.classList.toggle('open');
+            menu.classList.toggle('open', open);
+            overlay.classList.toggle('open', open);
+        };
+        btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+        overlay.addEventListener('click', () => { btn.classList.remove('open'); menu.classList.remove('open'); overlay.classList.remove('open'); });
+        // Close on Escape
+        menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggle(); });
+    },
+
+    initShortcuts() {
+        let lastG = 0;
+        document.addEventListener('keydown', (e) => {
+            // Skip if typing in an input/textarea/select
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            // Show help on ?
+            if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                this.showShortcutsHelp();
+                return;
+            }
+            // Go-to navigation: press g then a letter within 1s
+            if (e.key === 'g' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                lastG = Date.now();
+                return;
+            }
+            if (lastG && Date.now() - lastG < 1000) {
+                lastG = 0;
+                const map = {
+                    'd': '/pages/dashboard.html',
+                    's': '/pages/students.html',
+                    'u': '/pages/users.html',
+                    'r': '/pages/registrations.html',
+                    'a': '/pages/attendance-records.html',
+                    'c': '/pages/class-attendance.html',
+                    'p': '/pages/pull-outs.html',
+                    'e': '/pages/excuses.html',
+                    'l': '/pages/scan-logs.html',
+                    't': '/pages/settings.html',
+                    'h': '/pages/sections.html',
+                    'b': '/pages/backups.html',
+                };
+                const href = map[e.key.toLowerCase()];
+                if (href) { e.preventDefault(); window.location.href = href; }
+            }
+        });
+    },
+
+    showShortcutsHelp() {
+        const shortcuts = [
+            { keys: 'g then d', desc: 'Dashboard' },
+            { keys: 'g then s', desc: 'Students' },
+            { keys: 'g then u', desc: 'Users' },
+            { keys: 'g then r', desc: 'Registrations' },
+            { keys: 'g then a', desc: 'Attendance Records' },
+            { keys: 'g then c', desc: 'Class Attendance' },
+            { keys: 'g then p', desc: 'Pull-Outs' },
+            { keys: 'g then e', desc: 'Excuses' },
+            { keys: 'g then l', desc: 'Scan Logs' },
+            { keys: 'g then t', desc: 'Settings' },
+            { keys: 'g then h', desc: 'Sections' },
+            { keys: 'g then b', desc: 'Backups' },
+            { keys: '?', desc: 'Show this help' },
+        ];
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-dialog" style="max-width:420px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">⌨️ Keyboard Shortcuts</h3>
+                    <button onclick="this.closest('.confirm-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray);">×</button>
+                </div>
+                <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:14px;">
+                    ${shortcuts.map(s => `<code style="background:var(--light);padding:2px 6px;border-radius:4px;font-size:13px;">${s.keys}</code><span>${s.desc}</span>`).join('')}
+                </div>
+                <p style="margin-top:12px;font-size:12px;color:var(--gray);">Press <code>?</code> anytime to show this help.</p>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     },
 
     loadPage(page) {
@@ -252,6 +471,44 @@ const app = {
 
         const titleEl = document.getElementById('page-title');
         if (titleEl) titleEl.textContent = titles[page] || 'Page';
+        document.title = (titles[page] || 'Page') + ' - Ilaya NHS';
+
+        // Breadcrumbs
+        this.renderBreadcrumbs(page);
+    },
+
+    renderBreadcrumbs(page) {
+        const container = document.getElementById('breadcrumbs');
+        if (!container) return;
+        const crumbs = [
+            { text: 'Home', href: '/pages/dashboard.html' },
+        ];
+        const map = {
+            'users': 'System Users', 'registrations': 'Registration Approval',
+            'students': 'Student Management', 'parents': 'Parent Management',
+            'sections': 'Section Management', 'scanner': 'Attendance Scanner',
+            'class-attendance': 'Class Attendance', 'scan-logs': 'Scan Logs',
+            'attendance-records': 'Attendance Records', 'reports': 'Reports',
+            'adviser-dashboard': 'Adviser Dashboard', 'parent-portal': 'Parent Portal',
+            'parent-attendance': 'Attendance History', 'parent-notifications': 'Notifications',
+            'subjects': 'Subject Management', 'parent-excuse': 'Submit Excuse',
+            'pull-outs': 'Pull-Out Management', 'excuses': 'Excuse Slips',
+            'email-logs': 'Email Logs', 'audit-logs': 'Audit Logs',
+            'settings': 'System Settings', 'backups': 'Backup Management',
+        };
+        if (page === 'dashboard' || page === 'parent-portal' || page === 'adviser-dashboard') {
+            container.innerHTML = '';
+            return;
+        }
+        const label = map[page];
+        if (label) {
+            crumbs.push({ text: label });
+            container.innerHTML = crumbs.map((c, i) =>
+                c.href ? `<a href="${c.href}">${c.text}</a>` : `<span>${c.text}</span>`
+            ).join('<span class="crumb-sep">›</span>');
+        } else {
+            container.innerHTML = '';
+        }
     },
 
     showLoading(container) {
@@ -433,6 +690,79 @@ const app = {
 
     helpIcon(text) {
         return `<span class="help-icon" tabindex="0">?<span class="tooltip-text">${text}</span></span>`;
+    },
+
+    // ── Table sort ──
+    makeSortable(table) {
+        if (!table || table.dataset.sortable) return;
+        table.dataset.sortable = '1';
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        const thead = table.querySelector('thead');
+        if (!thead) return;
+        thead.querySelectorAll('th').forEach((th, colIdx) => {
+            if (th.querySelector('input,select,button')) return;
+            th.style.cursor = 'pointer';
+            th.style.userSelect = 'none';
+            th.addEventListener('click', () => {
+                const isAsc = th.getAttribute('data-sort-dir') === 'asc';
+                thead.querySelectorAll('th').forEach(h => h.removeAttribute('data-sort-dir'));
+                th.setAttribute('data-sort-dir', isAsc ? 'desc' : 'asc');
+                const rows = [...tbody.querySelectorAll('tr')];
+                const multiplier = isAsc ? -1 : 1;
+                rows.sort((a, b) => {
+                    const aVal = (a.cells[colIdx]?.textContent || '').trim();
+                    const bVal = (b.cells[colIdx]?.textContent || '').trim();
+                    const aNum = parseFloat(aVal.replace(/[^0-9.\-]/g, ''));
+                    const bNum = parseFloat(bVal.replace(/[^0-9.\-]/g, ''));
+                    if (!isNaN(aNum) && !isNaN(bNum)) return (aNum - bNum) * multiplier;
+                    return aVal.localeCompare(bVal, undefined, { numeric: true }) * multiplier;
+                });
+                rows.forEach(r => tbody.appendChild(r));
+                // Re-init pagination so it captures the new row order
+                this.paginateTable(table, 25, true);
+            });
+        });
+    },
+
+    // ── Table pagination ──
+    paginateTable(table, perPage = 25, force) {
+        if (!table || (table.dataset.paginated && !force)) return;
+        table.dataset.paginated = '1';
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        const rows = [...tbody.querySelectorAll('tr')];
+        if (rows.length <= perPage) return;
+        const wrapper = table.closest('.table-responsive') || table.parentNode;
+        // Remove old controls if re-initializing
+        const old = wrapper.querySelector('.pagination-controls');
+        if (old && force) old.remove();
+        let controls = wrapper.querySelector('.pagination-controls');
+        if (!controls) {
+            controls = document.createElement('div');
+            controls.className = 'pagination-controls';
+            wrapper.appendChild(controls);
+        }
+        // Restore all rows to visible when re-initializing
+        if (force) rows.forEach(r => r.style.display = '');
+        let currentPage = 1;
+        const totalPages = Math.ceil(rows.length / perPage);
+
+        function showPage(page) {
+            currentPage = Math.max(1, Math.min(page, totalPages));
+            const start = (currentPage - 1) * perPage;
+            const end = start + perPage;
+            rows.forEach((r, i) => r.style.display = (i >= start && i < end) ? '' : 'none');
+            controls.innerHTML = `
+                <button class="btn btn-sm btn-outline" ${currentPage <= 1 ? 'disabled' : ''} data-page="${currentPage - 1}">&laquo; Prev</button>
+                <span class="pagination-info">Page ${currentPage} of ${totalPages} (${rows.length} records)</span>
+                <button class="btn btn-sm btn-outline" ${currentPage >= totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">Next &raquo;</button>
+            `;
+            controls.querySelectorAll('button:not([disabled])').forEach(btn => {
+                btn.addEventListener('click', () => showPage(parseInt(btn.dataset.page)));
+            });
+        }
+        showPage(1);
     },
 };
 

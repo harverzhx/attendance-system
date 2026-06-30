@@ -121,23 +121,67 @@ class User extends Database
     {
         $db = self::getDb();
 
-        // Check if user is assigned as adviser to any section
-        $stmt = $db->prepare("SELECT COUNT(*) FROM sections WHERE adviser_id = ?");
-        $stmt->execute([$id]);
-        if ($stmt->fetchColumn() > 0) {
-            return ['success' => false, 'message' => 'Cannot delete: this user is assigned as adviser to one or more sections. Remove the adviser assignment first.'];
+        try {
+            $db->beginTransaction();
+
+            // Check adviser assignment
+            $stmt = $db->prepare("SELECT COUNT(*) FROM sections WHERE adviser_id = ?");
+            $stmt->execute([$id]);
+            if ($stmt->fetchColumn() > 0) {
+                $db->rollBack();
+                return ['success' => false, 'message' => 'Cannot delete: this user is assigned as adviser to one or more sections. Remove the adviser assignment first.'];
+            }
+
+            // Nullify references in tables with ON DELETE SET NULL equivalent
+            $db->prepare("UPDATE sections SET adviser_id = NULL WHERE adviser_id = ?")->execute([$id]);
+            $db->prepare("UPDATE audit_logs SET user_id = NULL WHERE user_id = ?")->execute([$id]);
+            $db->prepare("UPDATE registrations SET approved_by = NULL WHERE approved_by = ?")->execute([$id]);
+            $db->prepare("UPDATE backups SET created_by = NULL WHERE created_by = ?")->execute([$id]);
+            $db->prepare("UPDATE excuses SET teacher_reviewed_by = NULL WHERE teacher_reviewed_by = ?")->execute([$id]);
+            $db->prepare("UPDATE excuses SET approved_by = NULL WHERE approved_by = ?")->execute([$id]);
+            $db->prepare("UPDATE pull_outs SET created_by = NULL WHERE created_by = ?")->execute([$id]);
+
+            // Delete rows from tables with ON DELETE CASCADE equivalent
+            $db->prepare("DELETE FROM registrations WHERE user_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM teacher_sections WHERE teacher_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?")->execute([$id]);
+
+            // Delete the user
+            $stmt = $db->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt->execute([$id]);
+
+            if ($stmt->rowCount() === 0) {
+                $db->rollBack();
+                return ['success' => false, 'message' => 'User not found'];
+            }
+
+            $db->commit();
+            return ['success' => true, 'message' => 'User deleted'];
+        } catch (\Exception $e) {
+            $db->rollBack();
+            return ['success' => false, 'message' => 'Failed to delete user: ' . $e->getMessage()];
+        }
+    }
+
+    public static function deleteBatch(array $ids): array
+    {
+        $db = self::getDb();
+        $success = 0;
+        $errors = [];
+
+        foreach ($ids as $id) {
+            $result = self::delete((int)$id);
+            if ($result['success']) {
+                $success++;
+            } else {
+                $errors[] = "ID $id: " . $result['message'];
+            }
         }
 
-        // Check if user has registrations
-        $stmt = $db->prepare("SELECT COUNT(*) FROM registrations WHERE user_id = ?");
-        $stmt->execute([$id]);
-        if ($stmt->fetchColumn() > 0) {
-            return ['success' => false, 'message' => 'Cannot delete: this user has existing registrations.'];
-        }
-
-        $stmt = $db->prepare("DELETE FROM users WHERE user_id = ?");
-        $ok = $stmt->execute([$id]);
-        return ['success' => $ok, 'message' => $ok ? 'User deleted' : 'Failed to delete user'];
+        return [
+            'success' => $success > 0,
+            'message' => "$success user(s) deleted successfully" . ($errors ? '. Errors: ' . implode('; ', $errors) : '')
+        ];
     }
 
     public static function setStatus(int $id, string $status): bool

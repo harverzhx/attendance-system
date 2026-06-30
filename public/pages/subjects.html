@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><link rel="icon" href="/img/LogoINSH.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Subjects</title><link rel="stylesheet" href="/css/style.css">
 <style>
     .preset-grid { display:flex; flex-wrap:wrap; gap:6px; padding:12px 0; }
@@ -292,7 +292,7 @@ async function editSubject(id) {
 }
 
 async function deleteSubject(id) {
-    if (!confirm('Delete this subject?')) return;
+    if (!await app.confirmAction('Delete this subject?')) return;
     try {
         await api.del(`/subjects/${id}`);
         app.showAlert('Subject deleted', 'info');
@@ -487,6 +487,7 @@ async function assignSectionToTeacher() {
 }
 
 async function removeSectionFromTeacher(teacherId, sectionId) {
+    if (!await app.confirmAction('Remove this section from the teacher?')) return;
     try {
         await api.post('/teacher-sections/remove', { section_id: sectionId, teacher_id: teacherId });
         app.showAlert('Section removed', 'info');
@@ -511,7 +512,7 @@ async function assignSubject() {
 }
 
 async function removeTeacherSubject(teacherId, sectionId, subjectId) {
-    if (!confirm('Remove this assignment?')) return;
+    if (!await app.confirmAction('Remove this assignment?')) return;
     try {
         await api.post('/teacher-subjects/remove', { teacher_id: teacherId, section_id: sectionId, subject_id: subjectId });
         app.showAlert('Removed', 'info');
@@ -595,12 +596,6 @@ async function bulkAssignSubjects() {
     selectAllBulk(false);
     loadTeacherData();
 }
-
-// Override GET /teacher-subjects to accept teacher_id param
-const origGet = api.get;
-api.get = function(endpoint) {
-    return origGet.call(this, endpoint);
-};
 
 loadSubjects();
 loadTeachers();

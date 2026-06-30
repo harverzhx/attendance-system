@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><link rel="icon" href="/img/LogoINSH.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Attendance Scanner</title><link rel="stylesheet" href="/css/style.css">
 <style>
     .scanner-result { text-align:center; padding:24px; border-radius:12px; background:#f8fafc; margin-top:12px; }
@@ -64,6 +64,7 @@ auth.requireAuth();
 
 let cameraStream = null;
 let scanInterval = null;
+let cameraScanning = false;
 
 const scanInput = document.getElementById('scanInput');
 let lastScans = JSON.parse(localStorage.getItem('lastScans') || '[]');
@@ -341,6 +342,13 @@ function renderHistory() {
 
 renderHistory();
 scanInput.focus();
+function setupRefocus() {
+    refocusInterval = setInterval(() => {
+        const camera = document.getElementById('cameraOverlay');
+        if (camera && camera.style.display === 'flex') return;
+        ensureScanFocus();
+    }, 2000);
+}
 setupRefocus();
 document.addEventListener('click', ensureScanFocus);
 
@@ -355,9 +363,23 @@ function openCameraScanner() {
     status.textContent = 'Starting camera...';
 
     const onDetect = (code) => {
-        closeCameraScanner();
+        if (cameraScanning) return;
+        const now = Date.now();
+        if (lastScanTimestamps.has(code) && (now - lastScanTimestamps.get(code)) < DUPLICATE_WINDOW) {
+            return;
+        }
+        lastScanTimestamps.set(code, now);
+        detectStart = Date.now();
+        cameraScanning = true;
         document.getElementById('scanInput').value = code;
-        window.doScan(code);
+        const status = document.getElementById('cameraStatus');
+        status.textContent = '✓ Scanned — processing...';
+        status.style.color = '#16a34a';
+        window.doScan(code).finally(() => {
+            cameraScanning = false;
+            status.textContent = 'Scanning...';
+            status.style.color = '';
+        });
     };
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -392,8 +414,9 @@ function openCameraScanner() {
             video.srcObject = stream;
             video.play();
 
-            const detector = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_39'] });
+            let detector = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_39'] });
             let detectStart = Date.now();
+            let detectErrorCount = 0;
             const hintTimeout = setTimeout(() => {
                 if (status) status.innerHTML = 'Point camera at barcode and hold steady. <button onclick="closeCameraScanner()" class="btn btn-sm btn-secondary" style="margin-top:4px;">Cancel</button>';
             }, 8000);
@@ -401,13 +424,16 @@ function openCameraScanner() {
             function detectFrame() {
                 if (!video || video.readyState < 2) { scanInterval = requestAnimationFrame(detectFrame); return; }
                 detector.detect(video).then(barcodes => {
-                    if (barcodes.length > 0) { clearTimeout(hintTimeout); onDetect(barcodes[0].rawValue); return; }
-                    if (Date.now() - detectStart > 15000) {
-                        if (status) status.innerHTML = 'No barcode found. Try moving closer or use text input. <button onclick="closeCameraScanner()" class="btn btn-sm btn-primary" style="margin-top:4px;">OK</button>';
-                        return;
-                    }
+                    detectErrorCount = 0;
+                    if (barcodes.length > 0) { clearTimeout(hintTimeout); onDetect(barcodes[0].rawValue); }
                     scanInterval = requestAnimationFrame(detectFrame);
                 }).catch(() => {
+                    detectErrorCount++;
+                    // Recreate detector if it keeps failing (some browsers stall after first detect)
+                    if (detectErrorCount > 5) {
+                        try { detector = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_39'] }); } catch(_) {}
+                        detectErrorCount = 0;
+                    }
                     scanInterval = requestAnimationFrame(detectFrame);
                 });
             }
@@ -444,11 +470,9 @@ function openCameraScanner() {
                             src: dataUrl
                         }, (result) => {
                             if (result && result.codeResult && result.codeResult.code) {
-                                scanning = false;
-                                onDetect(result.codeResult.code);
-                            } else {
-                                setTimeout(decodeFrame, 150);
+                                if (!cameraScanning) onDetect(result.codeResult.code);
                             }
+                            setTimeout(decodeFrame, 150);
                         });
                     } else {
                         setTimeout(decodeFrame, 150);
@@ -474,6 +498,7 @@ function openCameraScanner() {
 }
 
 function closeCameraScanner() {
+    cameraScanning = false;
     if (scanInterval) { cancelAnimationFrame(scanInterval); clearTimeout(scanInterval); clearInterval(scanInterval); scanInterval = null; }
     if (cameraStream) {
         if (cameraStream._stopScan) cameraStream._stopScan();

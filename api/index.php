@@ -167,6 +167,23 @@ $app->route('DELETE /users/@id', function($id) use ($app, $auth) {
     }
 });
 
+$app->route('POST /users/batch-delete', function() use ($app, $auth) {
+    $auth->requireRole('Admin');
+    $data = json_decode(file_get_contents('php://input'), true);
+    $ids = $data['ids'] ?? [];
+    if (empty($ids) || !is_array($ids)) {
+        Response::error('No user IDs provided', 400);
+    }
+    $result = User::deleteBatch($ids);
+    if ($result['success']) {
+        $user = $auth->getAuthenticatedUser();
+        AuditLog::log($user['user_id'], 'DELETE', 'Batch deleted users: ' . implode(', ', $ids));
+        Response::json(['message' => $result['message']]);
+    } else {
+        Response::error($result['message'], 400);
+    }
+});
+
 $app->route('PUT /users/@id/activate', function($id) use ($app, $auth) {
     $auth->requireRole('Admin');
     if (User::setStatus($id, 'Active')) {

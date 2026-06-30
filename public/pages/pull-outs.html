@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><link rel="icon" href="/img/LogoINSH.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pull-Out Management</title><link rel="stylesheet" href="/css/style.css">
 <style>
     .po-card { padding:16px; border:1px solid var(--border); border-radius:8px; margin-bottom:12px; }
@@ -29,7 +29,7 @@
         <span>Pull-Out Records (Parent Pickup)</span>
         <span id="countBadge" style="font-size:14px;"></span>
     </div>
-    <div id="poList"><p style="text-align:center;padding:40px;color:var(--gray);">Loading...</p></div>
+    <div id="poList"><div class="loading">Loading...</div></div>
 </div>
 </div>
 
@@ -87,7 +87,7 @@ async function loadPullOuts() {
 }
 
 async function markReturned(id) {
-    if (!confirm('Mark this student as returned to campus?')) return;
+    if (!await app.confirmAction('Mark this student as returned to campus?')) return;
     try {
         await api.post(`/pull-outs/${id}/return`);
         app.showAlert('Student marked as returned', 'success');

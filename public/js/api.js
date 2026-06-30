@@ -51,6 +51,7 @@ const api = {
     createUser(data) { return this.post('/users', data); },
     updateUser(id, data) { return this.put(`/users/${id}`, data); },
     deleteUser(id) { return this.del(`/users/${id}`); },
+    deleteUsers(ids) { return this.post('/users/batch-delete', { ids }); },
     activateUser(id) { return this.put(`/users/${id}/activate`); },
     deactivateUser(id) { return this.put(`/users/${id}/deactivate`); },
 
